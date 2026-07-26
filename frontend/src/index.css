@@ -1,0 +1,185 @@
+@import "tailwindcss";
+
+@font-face {
+  font-family: "Metropolis";
+  src: url("/fonts/Metropolis-Light.otf") format("opentype");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Metropolis";
+  src: url("/fonts/Metropolis-Regular.otf") format("opentype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Metropolis";
+  src: url("/fonts/Metropolis-Medium.otf") format("opentype");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Metropolis";
+  src: url("/fonts/Metropolis-SemiBold.otf") format("opentype");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Metropolis";
+  src: url("/fonts/Metropolis-Bold.otf") format("opentype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Metropolis";
+  src: url("/fonts/Metropolis-Black.otf") format("opentype");
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@theme {
+  --color-brand-50: #f0fdfa;
+  --color-brand-100: #ccfbf1;
+  --color-brand-200: #99f6e4;
+  --color-brand-500: #14b8a6;
+  --color-brand-600: #0d9488;
+  --color-brand-700: #0f766e;
+  --color-brand-900: #134e4a;
+  --color-ink: #17212b;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  color: #17212b;
+  background: #f4f5f7;
+  font-family: "Metropolis", Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+button, input, select, textarea { font: inherit; }
+button { cursor: pointer; }
+
+.card { @apply rounded-[1.75rem] border border-white/80 bg-white/95 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur; }
+.input { @apply w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-brand-600 focus:ring-2 focus:ring-brand-100; }
+.label { @apply mb-1.5 block text-sm font-medium text-slate-700; }
+.btn-primary { @apply rounded-xl bg-brand-700 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-brand-700/20 transition hover:-translate-y-0.5 hover:bg-brand-600 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0; }
+.btn-secondary { @apply rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:-translate-y-0.5 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0; }
+.btn-ghost { @apply rounded-xl px-3 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-100; }
+.table-wrap { @apply overflow-x-auto rounded-[1.75rem] border border-white/80 bg-white/95 shadow-[0_18px_50px_rgba(15,23,42,0.07)] backdrop-blur; }
+th { @apply bg-slate-50/80 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500; }
+td { @apply border-t border-slate-100 px-4 py-3 text-sm text-slate-700; }
+tbody tr { @apply transition hover:bg-slate-50/70; }
+
+.app-surface {
+  background:
+    radial-gradient(circle at top left, rgba(20, 184, 166, 0.09), transparent 30rem),
+    radial-gradient(circle at bottom right, rgba(99, 102, 241, 0.08), transparent 28rem),
+    #f4f5f7;
+}
+
+.float-panel {
+  animation: float-in 520ms ease both;
+}
+
+.floating-tab {
+  transition: transform 180ms ease, box-shadow 180ms ease, background 180ms ease, color 180ms ease;
+}
+
+.floating-tab:hover {
+  transform: translateX(4px) translateY(-1px);
+  box-shadow: 0 14px 28px rgba(79, 100, 190, 0.12);
+}
+
+@keyframes float-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.shapegrid-canvas {
+  width: 100%;
+  height: 100%;
+  border: none;
+  display: block;
+  background:
+    radial-gradient(circle at 18% 20%, rgba(20, 184, 166, 0.22), transparent 24rem),
+    radial-gradient(circle at 82% 75%, rgba(2, 255, 42, 0.14), transparent 27rem),
+    linear-gradient(135deg, #020617 0%, #042f2e 44%, #020617 100%);
+}
+
+.shape-grid {
+  background:
+    radial-gradient(circle at 20% 20%, rgba(20, 184, 166, 0.18), transparent 25rem),
+    radial-gradient(circle at 80% 70%, rgba(34, 197, 94, 0.16), transparent 28rem),
+    linear-gradient(135deg, #020617 0%, #042f2e 45%, #020617 100%);
+}
+
+.shape-grid::before,
+.shape-grid::after {
+  content: "";
+  position: absolute;
+  inset: auto;
+  border-radius: 9999px;
+  filter: blur(60px);
+  opacity: 0.9;
+  animation: float-orb 12s ease-in-out infinite alternate;
+}
+
+.shape-grid::before {
+  width: 28rem;
+  height: 28rem;
+  right: -8rem;
+  bottom: -8rem;
+  background: rgba(20, 184, 166, 0.34);
+}
+
+.shape-grid::after {
+  width: 22rem;
+  height: 22rem;
+  left: -6rem;
+  top: -4rem;
+  background: rgba(16, 185, 129, 0.2);
+  animation-delay: -5s;
+}
+
+.shape-grid-cell {
+  position: relative;
+  min-height: 4rem;
+  border: 1px solid rgba(148, 163, 184, 0.055);
+}
+
+.shape-grid-cell::before {
+  content: "";
+  position: absolute;
+  inset: 18%;
+  border-radius: 1.25rem;
+  background: rgba(20, 184, 166, calc(var(--trail-opacity) * 0.48));
+  box-shadow:
+    0 0 20px rgba(20, 184, 166, calc(var(--trail-opacity) * 0.42)),
+    0 0 60px rgba(34, 197, 94, calc(var(--trail-opacity) * 0.28));
+  opacity: var(--trail-opacity);
+  transform: scale(var(--trail-scale)) rotate(45deg);
+  transition: opacity 650ms ease, transform 650ms ease, background 650ms ease;
+}
+
+@keyframes float-orb {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to { transform: translate3d(-2rem, 1.5rem, 0) scale(1.08); }
+}
