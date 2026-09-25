@@ -255,6 +255,15 @@ Start command: npm start
 Add the backend environment variables, using your MongoDB Atlas connection
 string. Set `FRONTEND_URL` to the final Vercel URL.
 
+For the current deployment, use:
+
+```text
+FRONTEND_URL=https://tuition-track.vercel.app
+```
+
+Do not use the Vercel project dashboard URL as `FRONTEND_URL`; it must be the
+public website origin where the React app is running.
+
 Copy the Render service URL and configure the Vercel project:
 
 ```text

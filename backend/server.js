@@ -18,9 +18,9 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-const allowedOrigins = (process.env.FRONTEND_URL || "")
+const allowedOrigins = (process.env.FRONTEND_URL || "https://tuition-track.vercel.app")
   .split(",")
-  .map((origin) => origin.trim())
+  .map((origin) => origin.trim().replace(/\/+$/, ""))
   .filter(Boolean);
 
 app.use(
