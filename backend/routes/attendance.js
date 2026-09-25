@@ -2,6 +2,7 @@ const express = require("express");
 const Attendance = require("../models/Attendance");
 const Student = require("../models/Student");
 const protect = require("../middleware/protect");
+const { getCreateOwnership, withDataScope } = require("../utils/access");
 
 const router = express.Router();
 router.use(protect);
@@ -11,11 +12,12 @@ router.get("/", async (req, res) => {
   try {
     const date = req.query.date || new Date().toISOString().slice(0, 10);
     if (!DATE_PATTERN.test(date)) return res.status(400).json({ message: "Date must use YYYY-MM-DD format" });
-    const studentQuery = { teacherId: req.teacher._id };
-    if (req.query.class) studentQuery.class = req.query.class;
+    const studentFilters = {};
+    if (req.query.class) studentFilters.class = req.query.class;
+    const studentQuery = withDataScope(req, studentFilters);
 
     const students = await Student.find(studentQuery).sort({ class: 1, name: 1 }).lean();
-    const records = await Attendance.find({ teacherId: req.teacher._id, date }).lean();
+    const records = await Attendance.find(withDataScope(req, { date })).lean();
     const byStudent = new Map(records.map((record) => [record.studentId.toString(), record]));
     res.json({ date, attendance: students.map((student) => ({ student, record: byStudent.get(student._id.toString()) || null })) });
   } catch (error) {
@@ -30,13 +32,13 @@ router.put("/mark", async (req, res) => {
     if (records.some((record) => !["present", "absent"].includes(record.status))) return res.status(400).json({ message: "Attendance status must be present or absent" });
 
     const studentIds = records.map((record) => record.studentId);
-    const ownedCount = await Student.countDocuments({ _id: { $in: studentIds }, teacherId: req.teacher._id });
+    const ownedCount = await Student.countDocuments(withDataScope(req, { _id: { $in: studentIds } }));
     if (ownedCount !== new Set(studentIds).size) return res.status(403).json({ message: "One or more students are invalid" });
 
     await Attendance.bulkWrite(records.map((record) => ({
       updateOne: {
         filter: { teacherId: req.teacher._id, studentId: record.studentId, date },
-        update: { $set: { status: record.status } },
+        update: { $set: { ...getCreateOwnership(req), status: record.status } },
         upsert: true,
       },
     })));

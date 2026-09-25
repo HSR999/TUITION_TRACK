@@ -11,6 +11,8 @@ const attendanceRoutes = require("./routes/attendance");
 const expenseRoutes = require("./routes/expenses");
 const dashboardRoutes = require("./routes/dashboard");
 const notificationRoutes = require("./routes/notifications");
+const teamRoutes = require("./routes/team");
+const instituteRoutes = require("./routes/institute");
 
 dotenv.config();
 
@@ -46,6 +48,8 @@ app.use("/api/attendance", attendanceRoutes);
 app.use("/api/expenses", expenseRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 app.use("/api/notifications", notificationRoutes);
+app.use("/api/team", teamRoutes);
+app.use("/api/institute", instituteRoutes);
 
 app.use((req, res) => res.status(404).json({ message: "Route not found" }));
 app.use((error, req, res, next) => {

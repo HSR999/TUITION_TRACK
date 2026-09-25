@@ -12,6 +12,7 @@ const Login = lazy(() => import("./pages/Login"));
 const Notifications = lazy(() => import("./pages/Notifications"));
 const Receipts = lazy(() => import("./pages/Receipts"));
 const Students = lazy(() => import("./pages/Students"));
+const Team = lazy(() => import("./pages/Team"));
 
 export default function App() {
   return (
@@ -26,6 +27,7 @@ export default function App() {
           <Route path="expenses" element={<Expenses />} />
           <Route path="notifications" element={<Notifications />} />
           <Route path="receipts" element={<Receipts />} />
+          <Route path="team" element={<Team />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

@@ -1,3 +1,10 @@
+const defaultReminderTemplates = {
+  upcoming_due: "Namaste {parentName} ji, reminder: {studentName} ki {month} tuition fee {amountDue} due date {dueDate} ko hai. Kripya time par payment kar dein. - TuitionTrack",
+  overdue: "Namaste {parentName} ji, {studentName} ki {month} tuition fee {amountDue} ab overdue hai. Due date {dueDate} thi. Kripya jaldi payment clear kar dein. - TuitionTrack",
+  partial: "Namaste {parentName} ji, {studentName} ki {month} tuition fee me {amountDue} balance pending hai. Kripya remaining amount clear kar dein. - TuitionTrack",
+  manual: "Namaste {parentName} ji, {studentName} ki {month} tuition fee {amountDue} pending hai. Kripya payment update kar dein. - TuitionTrack",
+};
+
 const normalizePhoneNumber = (phone) => {
   const digits = String(phone || "").replace(/\D/g, "");
   if (!digits) return "";
@@ -13,26 +20,43 @@ const formatDueDate = (date) => new Intl.DateTimeFormat("en-IN", {
   year: "numeric",
 }).format(date);
 
-const buildManualReminderMessage = ({ student, month, dueDate, amountDue, type }) => {
-  const dueText = formatDueDate(dueDate);
-  const amountText = new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 0,
-  }).format(amountDue);
+const formatAmount = (amountDue) => new Intl.NumberFormat("en-IN", {
+  style: "currency",
+  currency: "INR",
+  maximumFractionDigits: 0,
+}).format(amountDue);
 
-  if (type === "overdue") {
-    return `Namaste ${student.parentName} ji, ${student.name} ki ${month} tuition fee ${amountText} ab overdue hai. Due date ${dueText} thi. Kripya jaldi payment clear kar dein. - TuitionTrack`;
-  }
+const getReminderTemplate = ({ templates = {}, type = "manual" } = {}) => {
+  const template = templates?.[type];
+  return template?.trim() || defaultReminderTemplates[type] || defaultReminderTemplates.manual;
+};
 
-  if (type === "partial") {
-    return `Namaste ${student.parentName} ji, ${student.name} ki ${month} tuition fee me ${amountText} balance pending hai. Kripya remaining amount clear kar dein. - TuitionTrack`;
-  }
+const fillReminderTemplate = ({ template, student, month, dueDate, amountDue, type }) => {
+  const values = {
+    parentName: student.parentName || "Parent",
+    studentName: student.name || "Student",
+    month,
+    dueDate: formatDueDate(dueDate),
+    amountDue: formatAmount(amountDue),
+    feeType: String(type || "manual").replaceAll("_", " "),
+    class: student.class || "",
+  };
 
-  return `Namaste ${student.parentName} ji, reminder: ${student.name} ki ${month} tuition fee ${amountText} due date ${dueText} ko hai. Kripya time par payment kar dein. - TuitionTrack`;
+  return Object.entries(values).reduce(
+    (message, [key, value]) => message.replaceAll(`{${key}}`, String(value)),
+    template
+  );
+};
+
+const buildManualReminderMessage = ({ student, month, dueDate, amountDue, type, templates }) => {
+  const template = getReminderTemplate({ templates, type });
+  return fillReminderTemplate({ template, student, month, dueDate, amountDue, type });
 };
 
 module.exports = {
   buildManualReminderMessage,
+  defaultReminderTemplates,
+  fillReminderTemplate,
+  getReminderTemplate,
   normalizePhoneNumber,
 };

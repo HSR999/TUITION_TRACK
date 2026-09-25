@@ -8,6 +8,12 @@ const notificationLogSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    instituteId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Institute",
+      default: null,
+      index: true,
+    },
     studentId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Student",
@@ -30,5 +36,6 @@ const notificationLogSchema = new mongoose.Schema(
 );
 
 notificationLogSchema.index({ teacherId: 1, month: 1, recipientPhone: 1, channel: 1, type: 1 });
+notificationLogSchema.index({ instituteId: 1, month: 1, recipientPhone: 1, channel: 1, type: 1 });
 
 module.exports = mongoose.model("NotificationLog", notificationLogSchema);

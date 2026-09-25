@@ -5,6 +5,7 @@ const Attendance = require("../models/Attendance");
 const Expense = require("../models/Expense");
 const protect = require("../middleware/protect");
 const { currentMonth, monthRange } = require("../utils/month");
+const { withDataScope } = require("../utils/access");
 
 const router = express.Router();
 router.use(protect);
@@ -28,12 +29,12 @@ router.get("/", async (req, res) => {
     const nextMonthString = `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, "0")}-01`;
 
     const [students, currentFees, currentExpenses, attendanceRecords, revenueGroups] = await Promise.all([
-      Student.find({ teacherId }).select("feeAmount").lean(),
-      FeeRecord.find({ teacherId, month }).lean(),
-      Expense.find({ teacherId, date: { $gte: start, $lt: end } }).lean(),
-      Attendance.find({ teacherId, date: { $gte: `${month}-01`, $lt: nextMonthString } }).lean(),
+      Student.find(withDataScope(req)).select("feeAmount").lean(),
+      FeeRecord.find(withDataScope(req, { month })).lean(),
+      Expense.find(withDataScope(req, { date: { $gte: start, $lt: end } })).lean(),
+      Attendance.find(withDataScope(req, { date: { $gte: `${month}-01`, $lt: nextMonthString } })).lean(),
       FeeRecord.aggregate([
-        { $match: { teacherId, month: { $in: chartMonths } } },
+        { $match: withDataScope(req, { month: { $in: chartMonths } }) },
         { $group: { _id: "$month", revenue: { $sum: "$amountPaid" } } },
       ]),
     ]);

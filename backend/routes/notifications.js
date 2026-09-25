@@ -5,14 +5,16 @@ const protect = require("../middleware/protect");
 const { currentMonth, MONTH_PATTERN } = require("../utils/month");
 const { getReminderQueue } = require("../services/reminderService");
 const { buildManualReminderMessage, normalizePhoneNumber } = require("../utils/reminders");
+const { getCreateOwnership, withDataScope } = require("../utils/access");
 
 const router = express.Router();
 router.use(protect);
 
 router.get("/", async (req, res) => {
   try {
-    const query = { teacherId: req.teacher._id };
-    if (req.query.month) query.month = req.query.month;
+    const filters = {};
+    if (req.query.month) filters.month = req.query.month;
+    const query = withDataScope(req, filters);
 
     const notifications = await NotificationLog.find(query)
       .populate("studentId", "name class parentName parentPhone")
@@ -30,7 +32,7 @@ router.get("/reminder-queue", async (req, res) => {
     const month = req.query.month || currentMonth();
     if (!MONTH_PATTERN.test(month)) return res.status(400).json({ message: "Month must use YYYY-MM format" });
 
-    const reminders = await getReminderQueue({ teacherId: req.teacher._id, month });
+    const reminders = await getReminderQueue({ req, month });
     res.json({ month, reminders });
   } catch (error) {
     res.status(500).json({ message: "Could not build reminder queue", error: error.message });
@@ -42,7 +44,7 @@ router.post("/open/:studentId", async (req, res) => {
     const month = req.body.month || currentMonth();
     if (!MONTH_PATTERN.test(month)) return res.status(400).json({ message: "Month must use YYYY-MM format" });
 
-    const student = await Student.findOne({ _id: req.params.studentId, teacherId: req.teacher._id });
+    const student = await Student.findOne(withDataScope(req, { _id: req.params.studentId }));
     if (!student) return res.status(404).json({ message: "Student not found" });
     if (!student.parentPhone) return res.status(400).json({ message: "Parent phone number is missing" });
 
@@ -57,6 +59,7 @@ router.post("/open/:studentId", async (req, res) => {
 
     const notification = await NotificationLog.create({
       teacherId: req.teacher._id,
+      instituteId: req.teacher.instituteId?._id || req.teacher.instituteId || null,
       studentId: student._id,
       month,
       recipientPhone: `+${recipientPhone}`,
@@ -79,7 +82,7 @@ router.post("/open/:studentId", async (req, res) => {
 router.patch("/:id/handled", async (req, res) => {
   try {
     const notification = await NotificationLog.findOneAndUpdate(
-      { _id: req.params.id, teacherId: req.teacher._id },
+      withDataScope(req, { _id: req.params.id }),
       { status: "handled" },
       { new: true }
     );
@@ -96,7 +99,7 @@ router.post("/send/:studentId", async (req, res) => {
     const month = req.body.month || currentMonth();
     if (!MONTH_PATTERN.test(month)) return res.status(400).json({ message: "Month must use YYYY-MM format" });
 
-    const student = await Student.findOne({ _id: req.params.studentId, teacherId: req.teacher._id });
+    const student = await Student.findOne(withDataScope(req, { _id: req.params.studentId }));
     if (!student) return res.status(404).json({ message: "Student not found" });
 
     const recipientPhone = normalizePhoneNumber(student.parentPhone);
@@ -114,7 +117,7 @@ router.post("/send/:studentId", async (req, res) => {
     });
 
     const notification = await NotificationLog.create({
-      teacherId: req.teacher._id,
+      ...getCreateOwnership(req, student.teacherId || req.teacher._id),
       studentId: student._id,
       month,
       recipientPhone: `+${recipientPhone}`,

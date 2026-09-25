@@ -9,7 +9,7 @@ import { getErrorMessage } from "../utils/format";
 export default function Login() {
   const { teacher, login, register } = useAuth();
   const [mode, setMode] = useState("login");
-  const [form, setForm] = useState({ name: "", email: "", password: "" });
+  const [form, setForm] = useState({ instituteName: "", name: "", email: "", password: "" });
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -34,7 +34,7 @@ export default function Login() {
     setError("");
     setSubmitting(true);
     const demoForm = { email: "demo@tuitiontrack.com", password: "Demo@12345" };
-    setForm({ name: "", ...demoForm });
+    setForm({ instituteName: "", name: "", ...demoForm });
 
     try {
       await login(demoForm);
@@ -86,7 +86,7 @@ export default function Login() {
             <div className="relative mt-10 grid gap-3">
               {[
                 ["security", "JWT secured login"],
-                ["reminder", "Automated fee reminders"],
+                ["reminder", "Manual WhatsApp reminders"],
                 ["pdf", "PDF receipts + analytics"],
               ].map(([icon, item]) => (
                 <div key={item} className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-sm font-semibold backdrop-blur">
@@ -106,16 +106,27 @@ export default function Login() {
                   {mode === "login" ? "Sign in" : "Create account"}
                 </h1>
                 <p className="mt-2 text-sm text-slate-500">
-                  {mode === "login" ? "Access your teacher dashboard." : "Start your teacher workspace."}
+                  {mode === "login" ? "Access your institute dashboard." : "Create your institute workspace."}
                 </p>
               </div>
 
               <div className="mt-8 space-y-4">
                 {mode === "register" && (
-                  <label>
-                    <span className="label">Name</span>
-                    <input className="input" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} required />
-                  </label>
+                  <>
+                    <label>
+                      <span className="label">Institute / tuition name</span>
+                      <input
+                        className="input"
+                        placeholder="Bright Future Classes"
+                        value={form.instituteName}
+                        onChange={(event) => setForm({ ...form, instituteName: event.target.value })}
+                      />
+                    </label>
+                    <label>
+                      <span className="label">Owner name</span>
+                      <input className="input" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} required />
+                    </label>
+                  </>
                 )}
                 <label>
                   <span className="label">Email</span>

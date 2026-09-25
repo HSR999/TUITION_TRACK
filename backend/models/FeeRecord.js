@@ -8,6 +8,12 @@ const feeRecordSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    instituteId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Institute",
+      default: null,
+      index: true,
+    },
     studentId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Student",
@@ -34,5 +40,6 @@ const feeRecordSchema = new mongoose.Schema(
 );
 
 feeRecordSchema.index({ teacherId: 1, studentId: 1, month: 1 }, { unique: true });
+feeRecordSchema.index({ instituteId: 1, studentId: 1, month: 1 });
 
 module.exports = mongoose.model("FeeRecord", feeRecordSchema);

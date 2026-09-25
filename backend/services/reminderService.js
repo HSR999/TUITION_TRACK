@@ -1,6 +1,7 @@
 const Student = require("../models/Student");
 const FeeRecord = require("../models/FeeRecord");
 const { buildManualReminderMessage, normalizePhoneNumber } = require("../utils/reminders");
+const { withDataScope } = require("../utils/access");
 
 const UPCOMING_REMINDER_DAYS = Number(process.env.UPCOMING_REMINDER_DAYS || 3);
 
@@ -28,10 +29,11 @@ const daysBetween = (startDate, endDate) => {
   return Math.round((end - start) / (1000 * 60 * 60 * 24));
 };
 
-const getReminderQueue = async ({ teacherId, month }) => {
+const getReminderQueue = async ({ req, teacherId, month }) => {
   const today = getIndiaToday();
-  const students = await Student.find({ teacherId, parentPhone: { $ne: "" } }).sort({ class: 1, name: 1 }).lean();
-  const feeRecords = await FeeRecord.find({ teacherId, month }).lean();
+  const scope = req ? withDataScope(req) : { teacherId };
+  const students = await Student.find(req ? withDataScope(req, { parentPhone: { $ne: "" } }) : { teacherId, parentPhone: { $ne: "" } }).sort({ class: 1, name: 1 }).lean();
+  const feeRecords = await FeeRecord.find(req ? withDataScope(req, { month }) : { teacherId, month }).lean();
   const feeByStudent = new Map(feeRecords.map((record) => [record.studentId.toString(), record]));
 
   return students

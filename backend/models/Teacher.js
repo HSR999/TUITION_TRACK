@@ -3,6 +3,13 @@ const mongoose =require("mongoose");
 const bcrypt = require("bcryptjs");
 
 const teacherSchema = new mongoose.Schema({
+    instituteId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Institute",
+      default: null,
+      index: true,
+    },
+
     name: {
       type: String,
       required: true,
@@ -22,6 +29,26 @@ const teacherSchema = new mongoose.Schema({
       required: true,
       minlength: 6,
       select: false,
+    },
+
+    role: {
+      type: String,
+      enum: ["owner", "teacher"],
+      default: "owner",
+      index: true,
+    },
+
+    phone: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+
+    reminderTemplates: {
+      upcoming_due: { type: String, default: "" },
+      overdue: { type: String, default: "" },
+      partial: { type: String, default: "" },
+      manual: { type: String, default: "" },
     },
   },
   {

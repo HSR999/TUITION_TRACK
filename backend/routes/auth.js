@@ -1,6 +1,7 @@
 
 const express = require("express");
 const Teacher = require("../models/Teacher");
+const Institute = require("../models/Institute");
 const jwt = require("jsonwebtoken");
 const protect = require("../middleware/protect");
 
@@ -15,10 +16,29 @@ const generateToken = (teacherId) => {
   );
 };
 
+const serializeInstitute = (institute) => {
+  if (!institute) return null;
+  return {
+    id: institute._id,
+    name: institute.name,
+    logoUrl: institute.logoUrl,
+    phone: institute.phone,
+    address: institute.address,
+  };
+};
+
+const serializeTeacher = (teacher) => ({
+  id: teacher._id,
+  name: teacher.name,
+  email: teacher.email,
+  role: teacher.role || "owner",
+  phone: teacher.phone || "",
+  institute: serializeInstitute(teacher.instituteId),
+});
 
 router.post("/register", async (req, res) => {
   try {
-    const { name, email, password } = req.body;
+    const { name, email, password, instituteName, instituteLogoUrl, phone } = req.body;
 
     if (!name || !email || !password) {
       return res.status(400).json({
@@ -41,19 +61,28 @@ router.post("/register", async (req, res) => {
       });
     }
 
+    const institute = await Institute.create({
+      name: instituteName?.trim() || `${name.trim()}'s Tuition`,
+      logoUrl: instituteLogoUrl?.trim() || "",
+      phone: phone?.trim() || "",
+    });
+
     const teacher = await Teacher.create({
+      instituteId: institute._id,
       name,
       email: normalizedEmail,
       password,
+      role: "owner",
+      phone,
     });
 
+    institute.ownerId = teacher._id;
+    await institute.save();
+    await teacher.populate("instituteId", "name logoUrl phone address");
+
     res.status(201).json({
-      message: "Teacher registered successfully",
-      teacher: {
-        id: teacher._id,
-        name: teacher.name,
-        email: teacher.email,
-      },
+      message: "Institute owner registered successfully",
+      teacher: serializeTeacher(teacher),
     });
   } catch (error) {
     res.status(500).json({
@@ -74,7 +103,7 @@ router.post("/login", async (req, res) => {
 
     const teacher = await Teacher.findOne({
       email: email.trim().toLowerCase(),
-    }).select("+password");
+    }).select("+password").populate("instituteId", "name logoUrl phone address");
 
     if (!teacher) {
       return res.status(401).json({
@@ -95,11 +124,7 @@ router.post("/login", async (req, res) => {
     res.status(200).json({
       message: "Login successful",
       token,
-      teacher: {
-        id: teacher._id,
-        name: teacher.name,
-        email: teacher.email,
-      },
+      teacher: serializeTeacher(teacher),
     });
   } catch (error) {
     res.status(500).json({
@@ -111,11 +136,7 @@ router.post("/login", async (req, res) => {
 
 router.get("/me", protect, (req, res) => {
   res.status(200).json({
-    teacher: {
-      id: req.teacher._id,
-      name: req.teacher.name,
-      email: req.teacher.email,
-    },
+    teacher: serializeTeacher(req.teacher),
   });
 });
 

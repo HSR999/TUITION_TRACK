@@ -8,6 +8,12 @@ const studentSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    instituteId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Institute",
+      default: null,
+      index: true,
+    },
     name: { type: String, required: true, trim: true },
     phone: { type: String, required: true, trim: true },
     parentName: { type: String, required: true, trim: true },
@@ -33,5 +39,6 @@ const studentSchema = new mongoose.Schema(
 );
 
 studentSchema.index({ teacherId: 1, class: 1, name: 1 });
+studentSchema.index({ instituteId: 1, class: 1, name: 1 });
 
 module.exports = mongoose.model("Student", studentSchema);

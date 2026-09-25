@@ -22,7 +22,7 @@ const protect = async (req, res, next) => {
       process.env.JWT_SECRET
     );
 
-    const teacher = await Teacher.findById(decodedToken.id);
+    const teacher = await Teacher.findById(decodedToken.id).populate("instituteId", "name logoUrl phone address");
 
     if (!teacher) {
       return res.status(401).json({

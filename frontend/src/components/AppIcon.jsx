@@ -10,6 +10,8 @@ const fallbackLabels = {
   logo: "T",
   revenue: "₹",
   teacher: "T",
+  team: "T",
+  settings: "S",
   reminder: "!",
   security: "S",
   pdf: "P",

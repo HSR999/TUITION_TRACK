@@ -28,14 +28,14 @@ export default function StudentModal({ student, onClose, onSave, saving }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/40 p-4" onMouseDown={onClose}>
-      <form onSubmit={submit} onMouseDown={(event) => event.stopPropagation()} className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-3xl bg-white p-6 shadow-xl">
-        <div className="mb-5 flex items-center justify-between">
+    <div className="fixed inset-0 z-50 grid place-items-end bg-slate-950/40 p-0 sm:place-items-center sm:p-4" onMouseDown={onClose}>
+      <form onSubmit={submit} onMouseDown={(event) => event.stopPropagation()} className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-t-3xl bg-white p-5 shadow-xl sm:rounded-3xl sm:p-6">
+        <div className="mb-5 flex items-start justify-between gap-4">
           <div>
             <h2 className="text-xl font-bold">{student ? "Edit student" : "Add student"}</h2>
             <p className="text-sm text-slate-500">Parent phone is used to open WhatsApp with prepared reminders.</p>
           </div>
-          <button type="button" onClick={onClose} className="text-2xl text-slate-400">×</button>
+          <button type="button" onClick={onClose} className="text-2xl leading-none text-slate-400">×</button>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
@@ -68,7 +68,7 @@ export default function StudentModal({ student, onClose, onSave, saving }) {
           </label>
         </div>
 
-        <div className="mt-6 flex justify-end gap-3">
+        <div className="mt-6 flex flex-col-reverse justify-end gap-3 sm:flex-row">
           <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
           <button className="btn-primary" disabled={saving}>{saving ? "Saving..." : "Save student"}</button>
         </div>

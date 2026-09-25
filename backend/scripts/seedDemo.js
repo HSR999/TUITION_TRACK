@@ -4,6 +4,7 @@ const mongoose = require("mongoose");
 dotenv.config();
 
 const Teacher = require("../models/Teacher");
+const Institute = require("../models/Institute");
 const Student = require("../models/Student");
 const FeeRecord = require("../models/FeeRecord");
 const Attendance = require("../models/Attendance");
@@ -47,28 +48,49 @@ const connect = async () => {
 const clearExistingDemo = async () => {
   const existingTeacher = await Teacher.findOne({ email: DEMO_EMAIL });
   if (!existingTeacher) return;
+  const ownershipFilter = existingTeacher.instituteId
+    ? { $or: [{ teacherId: existingTeacher._id }, { instituteId: existingTeacher.instituteId }] }
+    : { teacherId: existingTeacher._id };
 
   await Promise.all([
-    Student.deleteMany({ teacherId: existingTeacher._id }),
-    FeeRecord.deleteMany({ teacherId: existingTeacher._id }),
-    Attendance.deleteMany({ teacherId: existingTeacher._id }),
-    Expense.deleteMany({ teacherId: existingTeacher._id }),
-    NotificationLog.deleteMany({ teacherId: existingTeacher._id }),
+    Student.deleteMany(ownershipFilter),
+    FeeRecord.deleteMany(ownershipFilter),
+    Attendance.deleteMany(ownershipFilter),
+    Expense.deleteMany(ownershipFilter),
+    NotificationLog.deleteMany(ownershipFilter),
   ]);
 
+  if (existingTeacher.instituteId) await Institute.deleteOne({ _id: existingTeacher.instituteId });
   await Teacher.deleteOne({ _id: existingTeacher._id });
 };
 
-const createTeacher = () => Teacher.create({
-  name: "Demo Teacher",
-  email: DEMO_EMAIL,
-  password: DEMO_PASSWORD,
-});
+const createTeacher = async () => {
+  const institute = await Institute.create({
+    name: "Bright Future Classes",
+    phone: "9876500000",
+    address: "Delhi, India",
+  });
 
-const createStudents = async (teacherId) => {
+  const teacher = await Teacher.create({
+    instituteId: institute._id,
+    name: "Demo Owner",
+    email: DEMO_EMAIL,
+    password: DEMO_PASSWORD,
+    role: "owner",
+    phone: "9876500000",
+  });
+
+  institute.ownerId = teacher._id;
+  await institute.save();
+
+  return teacher;
+};
+
+const createStudents = async (teacherId, instituteId) => {
   const joinedAt = new Date(new Date().getFullYear(), 0, 10);
   return Student.insertMany(studentsSeed.map(([name, phone, parentName, parentPhone, className, feeAmount, feeDueDate, address], index) => ({
     teacherId,
+    instituteId,
     name,
     phone,
     parentName,
@@ -82,7 +104,7 @@ const createStudents = async (teacherId) => {
   })));
 };
 
-const createFeeRecords = async (teacherId, students) => {
+const createFeeRecords = async (teacherId, instituteId, students) => {
   const now = new Date();
   const months = Array.from({ length: 6 }, (_, index) => monthKey(addMonths(now, index - 5)));
   const records = [];
@@ -100,6 +122,7 @@ const createFeeRecords = async (teacherId, students) => {
       const status = amountPaid === 0 ? "due" : amountPaid >= student.feeAmount ? "paid" : "partial";
       records.push({
         teacherId,
+        instituteId,
         studentId: student._id,
         month,
         amountPaid,
@@ -114,7 +137,7 @@ const createFeeRecords = async (teacherId, students) => {
   await FeeRecord.insertMany(records);
 };
 
-const createAttendance = async (teacherId, students) => {
+const createAttendance = async (teacherId, instituteId, students) => {
   const now = new Date();
   const records = [];
 
@@ -126,6 +149,7 @@ const createAttendance = async (teacherId, students) => {
     students.forEach((student, index) => {
       records.push({
         teacherId,
+        instituteId,
         studentId: student._id,
         date: dateKey(date),
         status: (index + dayOffset) % 7 === 0 ? "absent" : "present",
@@ -136,7 +160,7 @@ const createAttendance = async (teacherId, students) => {
   await Attendance.insertMany(records);
 };
 
-const createExpenses = async (teacherId) => {
+const createExpenses = async (teacherId, instituteId) => {
   const now = new Date();
   const expenses = [
     ["Classroom rent", 12000, "rent", 2],
@@ -147,6 +171,7 @@ const createExpenses = async (teacherId) => {
     ["Assistant payout", 5000, "salary", 18],
   ].map(([title, amount, category, day]) => ({
     teacherId,
+    instituteId,
     title,
     amount,
     category,
@@ -156,11 +181,12 @@ const createExpenses = async (teacherId) => {
   await Expense.insertMany(expenses);
 };
 
-const createNotifications = async (teacherId, students) => {
+const createNotifications = async (teacherId, instituteId, students) => {
   const now = new Date();
   const month = monthKey(now);
   const logs = students.slice(0, 6).map((student, index) => ({
     teacherId,
+    instituteId,
     studentId: student._id,
     month,
     recipientPhone: `+91${student.parentPhone}`,
@@ -184,13 +210,13 @@ const seed = async () => {
   await clearExistingDemo();
 
   const teacher = await createTeacher();
-  const students = await createStudents(teacher._id);
+  const students = await createStudents(teacher._id, teacher.instituteId);
 
   await Promise.all([
-    createFeeRecords(teacher._id, students),
-    createAttendance(teacher._id, students),
-    createExpenses(teacher._id),
-    createNotifications(teacher._id, students),
+    createFeeRecords(teacher._id, teacher.instituteId, students),
+    createAttendance(teacher._id, teacher.instituteId, students),
+    createExpenses(teacher._id, teacher.instituteId),
+    createNotifications(teacher._id, teacher.instituteId, students),
   ]);
 
   console.log("Demo data seeded successfully");

@@ -8,6 +8,12 @@ const attendanceSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    instituteId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Institute",
+      default: null,
+      index: true,
+    },
     studentId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Student",
@@ -21,5 +27,6 @@ const attendanceSchema = new mongoose.Schema(
 );
 
 attendanceSchema.index({ teacherId: 1, studentId: 1, date: 1 }, { unique: true });
+attendanceSchema.index({ instituteId: 1, studentId: 1, date: 1 });
 
 module.exports = mongoose.model("Attendance", attendanceSchema);

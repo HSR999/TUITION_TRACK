@@ -5,8 +5,8 @@ export default function Layout() {
   return (
     <div className="app-surface min-h-screen">
       <Navbar />
-      <main className="p-4 sm:p-6 lg:ml-80 lg:p-6">
-        <div className="mx-auto max-w-7xl float-panel">
+      <main className="px-3 pb-28 pt-4 sm:px-6 lg:ml-80 lg:p-8">
+        <div className="mx-auto max-w-[1440px] float-panel">
           <Outlet />
         </div>
       </main>
