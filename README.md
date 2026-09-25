@@ -11,7 +11,7 @@ insights, a working calendar, and profile/logout controls.
 
 ## Live deployment
 
-- **Vercel deployment:** [Open the TuitionTrack Vercel project](https://vercel.com/hemant-singh-rajputs-projects/tuition-track/A4AjaUZrtENvkSff8LHU8ddRPdPV)
+- **Vercel deployment:** [Open the TuitionTrack Vercel project](https://tuition-track.vercel.app/)
 
 The Vercel project hosts the frontend. Login and dashboard data also require a
 deployed backend API. Set the Vercel project environment variable
