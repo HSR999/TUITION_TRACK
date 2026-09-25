@@ -2,16 +2,18 @@ import { useEffect, useMemo, useState } from "react";
 import api from "../api/axios";
 import PageHeader from "../components/PageHeader";
 import { currentMonth, formatCurrency, formatDate, getErrorMessage, today } from "../utils/format";
+import { useToast } from "../context/ToastContext";
 
 const empty = { title: "", amount: "", date: today(), category: "other" };
 export default function Expenses() {
+  const { toast } = useToast();
   const [month, setMonth] = useState(currentMonth()); const [expenses, setExpenses] = useState([]); const [form, setForm] = useState(empty); const [editing, setEditing] = useState(null); const [error, setError] = useState("");
   const load = () => api.get("/expenses", { params: { month } }).then(({ data }) => setExpenses(data.expenses)).catch((err) => setError(getErrorMessage(err)));
-  useEffect(load, [month]);
+  useEffect(() => { load(); }, [month]);
   const total = useMemo(() => expenses.reduce((sum, item) => sum + item.amount, 0), [expenses]);
-  const submit = async (event) => { event.preventDefault(); try { const payload = { ...form, amount: Number(form.amount) }; editing ? await api.put(`/expenses/${editing}`, payload) : await api.post("/expenses", payload); setForm(empty); setEditing(null); load(); } catch (err) { setError(getErrorMessage(err)); } };
+  const submit = async (event) => { event.preventDefault(); try { const payload = { ...form, amount: Number(form.amount) }; editing ? await api.put(`/expenses/${editing}`, payload) : await api.post("/expenses", payload); setForm(empty); setEditing(null); toast(editing ? "Expense updated successfully" : "Expense added successfully"); load(); } catch (err) { setError(getErrorMessage(err)); } };
   const edit = (item) => { setEditing(item._id); setForm({ title: item.title, amount: item.amount, date: item.date.slice(0, 10), category: item.category }); };
-  const remove = async (id) => { if (!window.confirm("Delete this expense?")) return; await api.delete(`/expenses/${id}`); load(); };
+  const remove = async (id) => { if (!window.confirm("Delete this expense?")) return; await api.delete(`/expenses/${id}`); toast("Expense deleted successfully"); load(); };
   return (
     <>
       <PageHeader title="Expenses" subtitle="Know where your tuition income goes" action={<input className="input w-auto" type="month" value={month} onChange={(event) => setMonth(event.target.value)} />} />

@@ -1,17 +1,23 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import api from "../api/axios";
 import Alert from "../components/Alert";
 import EmptyState from "../components/EmptyState";
 import PageHeader from "../components/PageHeader";
 import StatusBadge from "../components/StatusBadge";
 import { currentMonth, formatCurrency, formatDate, getErrorMessage } from "../utils/format";
+import { useAuth } from "../context/AuthContext";
+import { DEFAULT_MESSAGE_TEMPLATE, getMessageTemplate, renderReminderMessage } from "../utils/reminders";
+import { useToast } from "../context/ToastContext";
 
 export default function Notifications() {
+  const { teacher } = useAuth();
+  const { toast } = useToast();
   const [month, setMonth] = useState(currentMonth());
   const [queue, setQueue] = useState([]);
   const [history, setHistory] = useState([]);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
+  const [template, setTemplate] = useState(getMessageTemplate);
 
   const load = async () => {
     try {
@@ -33,19 +39,29 @@ export default function Notifications() {
     try {
       setNotice("");
       setError("");
-      const { data } = await api.post(`/notifications/open/${reminder.studentId}`, reminder);
+      const message = renderReminderMessage(template, reminder, teacher?.name);
+      const { data } = await api.post(`/notifications/open/${reminder.studentId}`, { ...reminder, message });
       window.open(data.whatsappUrl, "_blank", "noopener,noreferrer");
       setNotice("WhatsApp opened with a prepared message. Press Send in WhatsApp, then mark it handled.");
+      toast("Reminder prepared in WhatsApp");
       load();
     } catch (err) {
       setError(getErrorMessage(err));
     }
   };
 
+  const preview = useMemo(() => queue[0] ? renderReminderMessage(template, queue[0], teacher?.name) : "", [queue, template, teacher?.name]);
+
+  const saveTemplate = (value) => {
+    setTemplate(value);
+    localStorage.setItem("tuitiontrack_message_template", value);
+  };
+
   const markHandled = async (id) => {
     try {
       await api.patch(`/notifications/${id}/handled`);
       setNotice("Reminder marked as handled");
+      toast("Reminder marked as handled");
       load();
     } catch (err) {
       setError(getErrorMessage(err));
@@ -62,6 +78,25 @@ export default function Notifications() {
 
       {notice && <Alert type="success">{notice}</Alert>}
       {error && <Alert type="error">{error}</Alert>}
+
+      <section className="card mb-6 p-5">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="max-w-xl">
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-brand-700">Message studio</p>
+            <h2 className="mt-1 font-black text-slate-900">Customize parent reminders</h2>
+            <p className="mt-1 text-sm text-slate-500">Use placeholders to automatically insert the child name, pending fee, month, due date, and your name.</p>
+            <p className="mt-2 text-xs font-semibold text-slate-400">{'{studentName}'} · {'{parentName}'} · {'{amountDue}'} · {'{month}'} · {'{dueDate}'} · {'{teacherName}'}</p>
+          </div>
+          <button className="btn-secondary shrink-0" onClick={() => saveTemplate(DEFAULT_MESSAGE_TEMPLATE)}>Reset template</button>
+        </div>
+        <textarea className="input mt-4 min-h-28 resize-y" value={template} onChange={(event) => saveTemplate(event.target.value)} aria-label="Reminder message template" />
+        {preview && (
+          <div className="mt-4 rounded-2xl bg-teal-50/70 p-4">
+            <p className="text-xs font-bold uppercase tracking-[0.14em] text-teal-700">Live preview for {queue[0].studentName}</p>
+            <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-700">{preview}</p>
+          </div>
+        )}
+      </section>
 
       <section className="card p-5">
         <div className="flex items-start justify-between gap-4">

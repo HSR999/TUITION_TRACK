@@ -5,8 +5,10 @@ import EmptyState from "../components/EmptyState";
 import LoadingState from "../components/LoadingState";
 import PageHeader from "../components/PageHeader";
 import { getErrorMessage, today } from "../utils/format";
+import { useToast } from "../context/ToastContext";
 
 export default function Attendance() {
+  const { toast } = useToast();
   const [date, setDate] = useState(today());
   const [classFilter, setClassFilter] = useState("");
   const [rows, setRows] = useState([]);
@@ -39,6 +41,7 @@ export default function Attendance() {
       });
       setNoticeType("success");
       setNotice("Attendance saved successfully");
+      toast("Attendance saved successfully");
     } catch (err) {
       setNoticeType("error");
       setNotice(getErrorMessage(err));

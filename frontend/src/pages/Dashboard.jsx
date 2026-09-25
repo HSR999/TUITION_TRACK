@@ -1,16 +1,21 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import api from "../api/axios";
 import Alert from "../components/Alert";
 import AppIcon from "../components/AppIcon";
 import LoadingState from "../components/LoadingState";
-import SmartInsights from "../components/SmartInsights";
-import StatusBadge from "../components/StatusBadge";
+import { useAuth } from "../context/AuthContext";
 import { formatCurrency, getErrorMessage } from "../utils/format";
 
+const monthDays = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
+
 export default function Dashboard() {
+  const { teacher, logout } = useAuth();
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
+  const [selectedDay, setSelectedDay] = useState(new Date().getDate());
+  const [profileOpen, setProfileOpen] = useState(false);
 
   useEffect(() => {
     api.get("/dashboard")
@@ -22,139 +27,107 @@ export default function Dashboard() {
   if (!data) return <LoadingState label="Loading dashboard" />;
 
   const { stats, feeCollection, revenueChart } = data;
-  const collectionRows = [
-    ["Paid fees", feeCollection.paid, "paid"],
-    ["Partial fees", feeCollection.partial, "partial"],
-    ["Due fees", feeCollection.due, "due"],
-  ];
+  const [year, monthNumber] = data.month.split("-").map(Number);
+  const daysInMonth = new Date(year, monthNumber, 0).getDate();
+  const firstDay = (new Date(year, monthNumber - 1, 1).getDay() + 6) % 7;
+  const calendarDays = Array.from({ length: firstDay + daysInMonth }, (_, index) => index < firstDay ? null : index - firstDay + 1);
+  const dueDays = data.dueDays || [];
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[1fr_300px]">
-      <section className="space-y-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="rounded-3xl bg-white/95 px-5 py-4 shadow-[0_14px_40px_rgba(15,23,42,0.06)]">
-            <p className="text-xs font-bold uppercase tracking-[0.24em] text-indigo-500">Dashboard</p>
-            <h1 className="mt-1 text-3xl font-black tracking-tight text-slate-900">Tuition overview</h1>
-          </div>
-
-          <div className="flex min-w-0 items-center gap-3 rounded-3xl bg-white/95 px-4 py-3 text-sm font-semibold text-slate-500 shadow-[0_14px_40px_rgba(15,23,42,0.06)]">
-            <AppIcon name="calendar" className="h-9 w-9" />
-            <span className="truncate">Current month · {data.month}</span>
+    <div className="reference-dashboard">
+      <header className="reference-header">
+        <div>
+          <p className="reference-kicker">TuitionTrack workspace</p>
+          <h1>Welcome back <span aria-hidden="true">👋</span></h1>
+        </div>
+        <div className="reference-header-actions">
+          <div className="profile-menu">
+            <button type="button" className="reference-avatar" onClick={() => setProfileOpen((open) => !open)} aria-label="Open profile">
+              {teacher?.name?.slice(0, 1) || "T"}
+            </button>
+            {profileOpen && (
+              <div className="profile-popover">
+                <strong>{teacher?.name || "Teacher"}</strong>
+                <span>{teacher?.email}</span>
+                <button type="button" onClick={logout}>Log out</button>
+              </div>
+            )}
           </div>
         </div>
+      </header>
 
-        <div className="card p-5">
-          <div className="mb-5 flex items-center justify-between">
-            <div>
-              <h2 className="text-lg font-black text-slate-900">Business readings</h2>
-              <p className="text-sm text-slate-500">Quick numbers like the utilities cards in your reference</p>
-            </div>
+      <div className="reference-grid">
+        <section className="reference-main-column">
+          <div className="reference-section-heading">
+            <h2>Your activities today</h2>
+            <span>({data.month})</span>
+          </div>
+          <div className="activity-grid">
+            <ActivityCard to="/students" tone="mint" icon="students" title="Student directory" detail={`${stats.totalStudents} active students`} />
+            <ActivityCard to="/fees" tone="pink" icon="fees" title="Fee collection" detail={`${feeCollection.due} payments need attention`} />
           </div>
 
-          <div className="grid gap-4 md:grid-cols-3">
-            <MetricTile title="Students" value={stats.totalStudents} unit="active" detail="Total enrolled" tint="from-indigo-50 to-indigo-100/60" icon="students" />
-            <MetricTile title="Revenue" value={formatCurrency(stats.monthlyRevenue)} unit="" detail={`Net ${formatCurrency(stats.netProfit)}`} tint="from-emerald-50 to-teal-100/60" icon="revenue" />
-            <MetricTile title="Attendance" value={stats.avgAttendance} unit="%" detail="Average this month" tint="from-amber-50 to-yellow-100/70" icon="attendance" />
+          <div className="reference-section-heading progress-heading">
+            <h2>Tuition health</h2>
           </div>
-        </div>
-
-        <SmartInsights stats={stats} feeCollection={feeCollection} />
-
-        <section className="card p-5">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-lg font-black text-slate-900">Tuition report</h2>
-              <p className="text-sm text-slate-500">Fee collection status and six month revenue trend</p>
-            </div>
-            <button className="btn-primary">View reports</button>
+          <div className="progress-grid">
+            <ProgressCard tone="mint" label="Paid fees" value={feeCollection.paid} detail="students cleared" to="/fees" />
+            <ProgressCard tone="yellow" label="Due fees" value={feeCollection.due} detail={formatCurrency(stats.pendingFees)} to="/notifications" />
+            <ProgressCard tone="lavender" label="Students" value={stats.totalStudents} detail={`${stats.avgAttendance}% attendance`} to="/students" />
           </div>
 
-          <div className="mt-6 grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
-            <div className="overflow-hidden rounded-3xl border border-slate-100">
-              <table className="w-full">
-                <thead>
-                  <tr><th>Name</th><th>Count</th><th>Status</th></tr>
-                </thead>
-                <tbody>
-                  {collectionRows.map(([label, count, status], index) => (
-                    <tr key={label} className={index % 2 === 0 ? "bg-indigo-50/45" : ""}>
-                      <td className="font-semibold text-slate-700">{label}</td>
-                      <td className="font-bold text-indigo-600">{count}</td>
-                      <td><StatusBadge status={status} /></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+          <Link to="/fees" className="course-card tone-yellow">
+            <div className="course-card-top"><span className="course-icon"><AppIcon name="fees" className="h-4 w-4" /></span><strong>Fee follow-up</strong><span className="circle-arrow">↗</span></div>
+            <p>{feeCollection.due} students have outstanding balances totalling {formatCurrency(stats.pendingFees)}</p>
+            <div className="progress-track"><span style={{ width: `${Math.max(12, Math.round((feeCollection.paid / Math.max(stats.totalStudents, 1)) * 100))}%` }} /></div>
+          </Link>
 
-            <div className="h-72 rounded-3xl bg-slate-50/70 p-4">
+          <section className="reference-report card">
+            <div className="reference-report-heading">
+              <div><h2>Revenue trend</h2><p>Six month collection overview</p></div>
+              <Link to="/fees" className="reference-link">View fees ↗</Link>
+            </div>
+            <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={revenueChart}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                  <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-                  <YAxis tick={{ fontSize: 11 }} />
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+                  <XAxis dataKey="month" tick={{ fontSize: 10 }} />
+                  <YAxis tick={{ fontSize: 10 }} />
                   <Tooltip formatter={(value) => formatCurrency(value)} />
-                  <Bar dataKey="revenue" fill="#6677cc" radius={[10, 10, 0, 0]} />
+                  <Bar dataKey="revenue" fill="#b9dcdc" radius={[10, 10, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
-          </div>
-        </section>
-      </section>
-
-      <aside className="space-y-6">
-        <section className="card p-5">
-          <div className="flex items-center gap-3">
-            <AppIcon name="teacher" className="h-14 w-14" />
-            <div>
-              <p className="font-black text-slate-900">Teacher account</p>
-              <p className="text-xs text-emerald-500">Verified dashboard</p>
-            </div>
-          </div>
-
-          <div className="mt-6 space-y-3">
-            <SideStat label="Pending fees" value={formatCurrency(stats.pendingFees)} />
-            <SideStat label="Expenses" value={formatCurrency(stats.monthlyExpenses)} />
-            <SideStat label="Net profit" value={formatCurrency(stats.netProfit)} />
-          </div>
+          </section>
         </section>
 
-        <section className="card overflow-hidden p-5">
-          <p className="text-lg font-black text-slate-900">Payment focus</p>
-          <p className="mt-1 text-sm text-slate-500">Follow up dues before they pile up.</p>
-          <div className="mt-5 rounded-3xl bg-indigo-50 p-4">
-            <p className="text-sm font-bold text-indigo-700">{feeCollection.due} due students</p>
-            <p className="mt-1 text-xs text-indigo-500">Use the Fees page reminder button to open prepared WhatsApp messages.</p>
+        <aside className="reference-side-column">
+          <div className="reference-section-heading"><h2>Lesson schedule</h2></div>
+          <div className="calendar-card">
+            <div className="calendar-title"><strong>{new Date(year, monthNumber - 1).toLocaleString("en-IN", { month: "long", year: "numeric" })}</strong><span>{dueDays.length} due</span></div>
+            <div className="calendar-week">{monthDays.map((day) => <span key={day}>{day}</span>)}</div>
+            <div className="calendar-days">{calendarDays.map((day, index) => <button type="button" key={`${day}-${index}`} onClick={() => day && setSelectedDay(day)} className={day === selectedDay ? "selected" : day && dueDays.includes(day) ? "soft due-day" : !day ? "muted" : ""}>{day || ""}</button>)}</div>
+            <p className="calendar-insight">{dueDays.includes(selectedDay) ? `Fee follow-up due on ${selectedDay} ${new Date(year, monthNumber - 1).toLocaleString("en-IN", { month: "short" })}.` : `No fee due recorded on ${selectedDay} ${new Date(year, monthNumber - 1).toLocaleString("en-IN", { month: "short" })}.`}</p>
           </div>
-        </section>
-      </aside>
-    </div>
-  );
-}
 
-function MetricTile({ title, value, unit, detail, tint, icon }) {
-  return (
-    <div className={`rounded-3xl bg-gradient-to-br ${tint} p-5 shadow-sm transition hover:-translate-y-1 hover:shadow-xl hover:shadow-slate-200/70`}>
-      <div className="flex items-center justify-between">
-        <span className="grid h-10 w-10 place-items-center rounded-2xl bg-white/70">
-          <AppIcon name={icon} className="h-6 w-6" />
-        </span>
-        <span className="text-xs font-bold text-emerald-500">Live</span>
+          <Link to="/notifications" className="schedule-card tone-mint"><span className="schedule-icon"><AppIcon name="reminder" /></span><span>Follow up outstanding fee reminders</span><b>↗</b></Link>
+          <Link to="/attendance" className="schedule-card tone-lavender"><span className="schedule-icon"><AppIcon name="attendance" /></span><span>Review this month&apos;s attendance</span><b>↗</b></Link>
+          <Link to="/expenses" className="schedule-card tone-pink"><span className="schedule-icon"><AppIcon name="expenses" /></span><span>Check coaching expenses</span><b>↗</b></Link>
+
+          <div className="reference-account card">
+            <AppIcon name="teacher" className="h-10 w-10" />
+            <div><strong>{teacher?.name || "Teacher"}</strong><span>{teacher?.email || "Teaching workspace"}</span></div>
+          </div>
+        </aside>
       </div>
-      <p className="mt-5 text-sm font-semibold text-slate-500">{title}</p>
-      <p className="mt-1 text-3xl font-black text-indigo-600">
-        {value} <span className="text-sm">{unit}</span>
-      </p>
-      <p className="mt-2 text-xs font-medium text-slate-500">{detail}</p>
     </div>
   );
 }
 
-function SideStat({ label, value }) {
-  return (
-    <div className="flex items-center justify-between rounded-2xl bg-slate-50 px-4 py-3">
-      <span className="text-sm font-semibold text-slate-500">{label}</span>
-      <span className="font-black text-slate-900">{value}</span>
-    </div>
-  );
+function ActivityCard({ to, tone, icon, title, detail }) {
+  return <Link to={to} className={`activity-card tone-${tone}`}><div className="activity-avatars"><AppIcon name={icon} className="h-8 w-8" /><span>+6</span></div><strong>{title}</strong><small>{detail}</small><span className="circle-arrow">↗</span></Link>;
+}
+
+function ProgressCard({ to, tone, label, value, detail }) {
+  return <Link to={to} className={`progress-card tone-${tone}`}><small>{label}</small><strong>{value}</strong><span>{detail}</span><span className="circle-arrow">↗</span></Link>;
 }

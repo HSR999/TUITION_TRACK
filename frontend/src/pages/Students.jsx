@@ -7,8 +7,10 @@ import LoadingState from "../components/LoadingState";
 import PageHeader from "../components/PageHeader";
 import StudentModal from "../components/StudentModal";
 import { formatCurrency, getErrorMessage } from "../utils/format";
+import { useToast } from "../context/ToastContext";
 
 export default function Students() {
+  const { toast } = useToast();
   const [students, setStudents] = useState([]);
   const [search, setSearch] = useState("");
   const [selectedClass, setSelectedClass] = useState("");
@@ -45,6 +47,7 @@ export default function Students() {
       modal ? await api.put(`/students/${modal._id}`, form) : await api.post("/students", form);
       setShowModal(false);
       setModal(null);
+      toast(modal ? "Student updated successfully" : "Student added successfully");
       load();
     } catch (err) {
       setError(getErrorMessage(err));
@@ -57,6 +60,7 @@ export default function Students() {
     if (!window.confirm(`Delete ${student.name} and all related records?`)) return;
     try {
       await api.delete(`/students/${student._id}`);
+      toast("Student deleted successfully");
       load();
     } catch (err) {
       setError(getErrorMessage(err));

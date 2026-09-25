@@ -8,8 +8,13 @@ import PageHeader from "../components/PageHeader";
 import ReceiptModal from "../components/ReceiptModal";
 import StatusBadge from "../components/StatusBadge";
 import { currentMonth, formatCurrency, getErrorMessage } from "../utils/format";
+import { useAuth } from "../context/AuthContext";
+import { getMessageTemplate, renderReminderMessage } from "../utils/reminders";
+import { useToast } from "../context/ToastContext";
 
 export default function Fees() {
+  const { teacher } = useAuth();
+  const { toast } = useToast();
   const [month, setMonth] = useState(currentMonth());
   const [classFilter, setClassFilter] = useState("");
   const [fees, setFees] = useState([]);
@@ -42,6 +47,7 @@ export default function Fees() {
     try {
       const { data } = await api.put(`/fees/${item.student._id}/${month}`, { amountPaid: Number(amounts[item.student._id] || 0) });
       setMessage("Fee saved successfully");
+      toast("Fee payment saved successfully");
       load();
       if (data.record.amountPaid > 0) setReceipt({ student: data.student, record: data.record });
     } catch (err) {
@@ -58,9 +64,17 @@ export default function Fees() {
         month,
         amountDue,
         type: item.record.status === "partial" ? "partial" : "manual",
+        message: renderReminderMessage(getMessageTemplate(), {
+          parentName: item.student.parentName,
+          studentName: item.student.name,
+          month,
+          amountDue,
+          dueDate: item.student.feeDueDate,
+        }, teacher?.name),
       });
       window.open(data.whatsappUrl, "_blank", "noopener,noreferrer");
       setMessage("WhatsApp opened with a prepared reminder message. Press Send in WhatsApp.");
+      toast("Reminder prepared in WhatsApp");
     } catch (err) {
       setError(getErrorMessage(err));
     }
