@@ -1,185 +1,338 @@
 # TuitionTrack
 
-TuitionTrack is a full-stack MERN tuition-management application for teachers. It manages students, monthly fees, attendance, expenses, dashboards, email reminders, notification history, and PDF receipts.
+TuitionTrack is a full-stack tuition-management application for teachers,
+coaching institutes, and private tutors. It provides one workspace for
+managing students, fees, attendance, expenses, reminders, notifications, and
+payment receipts.
 
-## 1. How the application is divided
+The application has a polished React dashboard with a light glassmorphism
+interface, responsive layouts, toast feedback, dashboard analytics, fee due
+insights, a working calendar, and profile/logout controls.
 
-The application has two separate programs:
+## Live deployment
 
-- `backend/` is an Express API. It validates requests, applies business rules, communicates with MongoDB, sends emails, and returns JSON.
-- `frontend/` is a React/Vite app. It displays pages, gathers form input, calls the API with Axios, and stores the login token.
+- **Vercel deployment:** [Open the TuitionTrack Vercel project](https://vercel.com/hemant-singh-rajputs-projects/tuition-track/A4AjaUZrtENvkSff8LHU8ddRPdPV)
 
-The main request flow is:
+The Vercel project hosts the frontend. Login and dashboard data also require a
+deployed backend API. Set the Vercel project environment variable
+`VITE_API_URL` to the public backend URL ending in `/api`, then redeploy the
+frontend. Do not use `http://localhost:5000/api` in Vercel because
+`localhost` means the visitor's own computer.
+
+## Quick access: demo mode
+
+Demo mode is the easiest way to preview the complete application without
+creating a MongoDB database.
+
+### Demo login
 
 ```text
-React page -> Axios -> Express route -> JWT middleware -> Mongoose model -> MongoDB Atlas
+Email:    demo@tuitiontrack.com
+Password: Demo@12345
 ```
 
-## 2. Run locally
+The login page also has a **Use demo account** button that fills in these
+credentials automatically.
 
-### Backend
+### Start the demo locally
 
-Copy `backend/.env.example` to `backend/.env` and insert real values. Never commit `.env`.
+Open two PowerShell terminals from the repository root.
+
+Terminal 1 - demo API:
 
 ```powershell
 cd backend
 npm install
-npm run dev
+npm run demo
 ```
 
-The API runs at `http://localhost:5000`.
+The demo API runs at `http://localhost:5000`.
 
-### Frontend
-
-Copy `frontend/.env.example` to `frontend/.env`.
+Terminal 2 - frontend:
 
 ```powershell
 cd frontend
 npm install
+Copy-Item .env.example .env
 npm run dev
 ```
 
-The website runs at `http://localhost:5173`.
+Open `http://localhost:5173` and sign in using the demo credentials above.
 
-If the global `npm` launcher on this Windows machine reports a missing `npm-cli.js`, this direct form uses the npm bundled with Node:
+Demo mode includes sample students, fee records, attendance, expenses,
+dashboard metrics, calendar due dates, and notification history. Demo data is
+stored in memory, so changes are reset when the demo API restarts.
 
-```powershell
-node "C:\Program Files\nodejs\node_modules\npm\bin\npm-cli.js" run dev
+## What the application does
+
+- **Dashboard:** student count, fee collection, pending dues, attendance,
+  expenses, net profit, revenue trends, activity, and fee due calendar.
+- **Students:** add, edit, search, filter, and delete student records.
+- **Fees:** track paid, partial, and due amounts by month; record payments;
+  generate receipt numbers; and open reminder actions.
+- **Attendance:** mark attendance by date and class.
+- **Expenses:** manage monthly tuition-business expenses.
+- **Notifications:** review reminder history and delivery status.
+- **Reminder studio:** customize parent messages with placeholders such as
+  `{studentName}`, `{parentName}`, `{amountDue}`, `{month}`, `{dueDate}`, and
+  `{teacherName}`.
+- **Receipts:** create downloadable PDF payment receipts in the browser.
+- **Institute and team management:** manage institute information and team
+  access where enabled by the backend.
+- **Authentication:** JWT-based login, registration, protected routes, and
+  logout.
+
+## Project structure
+
+```text
+Tuition_Track/
+├── backend/
+│   ├── config/          MongoDB connection
+│   ├── middleware/      Authentication and request protection
+│   ├── models/          Mongoose database models
+│   ├── routes/          Auth, students, fees, attendance, etc.
+│   ├── scripts/         Database seed scripts
+│   ├── services/        Reminder and application services
+│   ├── utils/           Shared backend helpers
+│   ├── server.js        Production MongoDB API
+│   ├── server.demo.js   In-memory demo API
+│   └── package.json
+├── frontend/
+│   ├── src/
+│   │   ├── api/          Axios API client
+│   │   ├── components/   Shared UI components
+│   │   ├── context/      Auth and toast state
+│   │   ├── pages/        Dashboard and application pages
+│   │   └── utils/        Formatting and reminder helpers
+│   └── package.json
+└── README.md
 ```
 
-## 3. Environment variables
+## Production local setup
 
-Backend:
+Production mode uses Express, MongoDB Atlas, JWT authentication, and the
+backend's configured reminder services.
 
-- `MONGO_URI`: MongoDB Atlas connection string.
-- `JWT_SECRET`: private signing secret for login tokens.
-- `JWT_EXPIRES_IN`: token lifetime, such as `7d`.
-- `FRONTEND_URL`: allowed frontend origin. Multiple origins can be comma-separated.
-- `EMAIL_SERVICE`: for example `gmail`.
-- `EMAIL_USER` and `EMAIL_PASS`: SMTP account and app password.
-- `EMAIL_FROM`: sender name/address shown to parents.
+### 1. Configure the backend
 
-Frontend:
+Copy the example environment file:
 
-- `VITE_API_URL`: backend URL ending in `/api`.
+```powershell
+cd backend
+Copy-Item .env.example .env
+```
 
-## 4. Backend, step by step
+Fill in `backend/.env`:
 
-### Server startup
+```env
+PORT=5000
+MONGO_URI=mongodb+srv://username:password@cluster.mongodb.net/tuitiontrack
+JWT_SECRET=replace_with_a_long_random_secret
+JWT_EXPIRES_IN=7d
+FRONTEND_URL=http://localhost:5173
+UPCOMING_REMINDER_DAYS=3
+```
 
-`backend/server.js` loads environment variables, connects to Atlas, registers CORS/JSON middleware, mounts each route group, starts the reminder scheduler, and finally listens for HTTP requests.
+Keep `.env` private. Never commit passwords, database URLs, JWT secrets, or
+email credentials.
 
-### Database models
+Install and start the API:
 
-- `Teacher.js` hashes passwords before saving and provides `comparePassword()` for login.
-- `Student.js` stores student, parent, class, fee, and due-day data.
-- `FeeRecord.js` stores one record per student per `YYYY-MM` month.
-- `Attendance.js` stores one present/absent result per student per date.
-- `Expense.js` stores categorized business spending.
-- `NotificationLog.js` records successful and failed reminder emails.
+```powershell
+npm install
+npm run dev
+```
 
-Every business model includes `teacherId`. Routes always query with the authenticated teacher ID, preventing one teacher from reading another teacher's data.
+### 2. Configure the frontend
 
-### Authentication
+In a second terminal:
 
-`routes/auth.js` provides register, login, and current-user endpoints. Login checks the bcrypt password and signs a JWT containing the teacher ID.
+```powershell
+cd frontend
+Copy-Item .env.example .env
+```
 
-`middleware/protect.js` reads `Authorization: Bearer TOKEN`, verifies the signature/expiry, loads the teacher, and puts it on `req.teacher`. Every private route uses this middleware.
+Set the API URL in `frontend/.env`:
 
-### Student CRUD
+```env
+VITE_API_URL=http://localhost:5000/api
+```
 
-`routes/students.js` supports create, list, search, class filtering, update, and delete. Delete also removes the student's fee, attendance, and notification records.
+Then start the frontend:
 
-### Monthly fees
+```powershell
+npm install
+npm run dev
+```
 
-`routes/fees.js` combines all students with the selected month's records. Missing records appear as due. Saving an amount creates or updates the monthly record and calculates `due`, `partial`, or `paid`. A changed positive payment receives a receipt number.
+The frontend runs at `http://localhost:5173`.
 
-### Attendance
+## Database and demo seed
 
-`routes/attendance.js` returns all students plus their selected-date status. Saving uses MongoDB `bulkWrite`, efficiently upserting the whole class in one request.
+For a MongoDB-backed local environment, the backend includes a demo seed
+script. Configure `MONGO_URI` first, then run:
 
-### Expenses and dashboard
+```powershell
+cd backend
+npm run seed:demo
+```
 
-`routes/expenses.js` implements monthly filtering and CRUD. `routes/dashboard.js` calculates student count, revenue, pending fees, expenses, net profit, attendance percentage, fee-status counts, and six-month chart data.
+This creates the demo teacher and sample records in MongoDB:
 
-### Email reminders
+```text
+Email:    demo@tuitiontrack.com
+Password: Demo@12345
+```
 
-`cronJobs.js` schedules the job for 8:00 AM in `Asia/Kolkata`. `services/reminderService.js` finds fees due in three days, skips fully paid students, and checks `NotificationLog` by parent email/month before sending. This also prevents siblings with the same parent email from receiving duplicate reminders.
+Use `npm run demo` instead if you want an in-memory preview with no database.
 
-`utils/email.js` owns Nodemailer configuration and the email template. Manual reminders use the same service, so manual and automatic messages produce consistent logs.
+## Important environment variables
 
-## 5. Frontend, step by step
+### Backend
 
-### Entry and routing
+| Variable | Purpose |
+| --- | --- |
+| `PORT` | API port; defaults to `5000` |
+| `MONGO_URI` | MongoDB connection string |
+| `JWT_SECRET` | Secret used to sign login tokens |
+| `JWT_EXPIRES_IN` | JWT lifetime, for example `7d` |
+| `FRONTEND_URL` | Allowed frontend origin for CORS |
+| `UPCOMING_REMINDER_DAYS` | Days before a fee due date to include in reminders |
 
-`src/main.jsx` mounts React, the router, and authentication context. `src/App.jsx` defines public/private pages and lazy-loads pages to keep the initial bundle small.
+### Frontend
 
-### Authentication state
+| Variable | Purpose |
+| --- | --- |
+| `VITE_API_URL` | Backend API URL ending with `/api` |
 
-`context/AuthContext.jsx` handles register, login, logout, and session restoration. The JWT and basic teacher profile are kept in local storage.
-
-`api/axios.js` supplies the API base URL and automatically adds the JWT to every request. A `401` response clears the expired session and returns to login.
-
-### Pages
-
-- Dashboard renders API statistics and a Recharts revenue graph.
-- Students provides class cards, all-students view, search, and CRUD modal.
-- Fees provides list/calendar views, payment status, receipts, and manual reminders.
-- Attendance marks present/absent for a selected date/class.
-- Expenses manages categorized spending and monthly totals.
-- Receipts uses jsPDF to create printable payment PDFs in the browser.
-- Notifications displays Nodemailer success/failure history.
-
-Reusable UI lives in `src/components/`; shared date, currency, and error formatting lives in `src/utils/format.js`.
-
-## 6. Main API routes
+## API overview
 
 ```text
 POST   /api/auth/register
 POST   /api/auth/login
 GET    /api/auth/me
 
-GET    /api/students?class=9&search=name
+GET    /api/dashboard
+
+GET    /api/students
 POST   /api/students
-GET    /api/students/:id
 PUT    /api/students/:id
 DELETE /api/students/:id
 
-GET    /api/fees?month=YYYY-MM&class=9
+GET    /api/fees
 PUT    /api/fees/:studentId/:month
 
-GET    /api/attendance?date=YYYY-MM-DD&class=9
+GET    /api/attendance
 PUT    /api/attendance/mark
 
-GET    /api/expenses?month=YYYY-MM
+GET    /api/expenses
 POST   /api/expenses
 PUT    /api/expenses/:id
 DELETE /api/expenses/:id
 
-GET    /api/dashboard
-GET    /api/notifications?month=YYYY-MM
+GET    /api/notifications
 POST   /api/notifications/send/:studentId
 ```
 
-## 7. Deployment
+Protected endpoints require the JWT returned by login:
 
-### Render backend
+```text
+Authorization: Bearer <token>
+```
 
-- Root directory: `backend`
-- Build command: `npm install`
-- Start command: `npm start`
-- Add all backend environment variables.
-- Set `FRONTEND_URL` to the final Vercel URL.
+## Deployment
 
-Render must be able to reach Atlas. Configure Atlas Network Access appropriately and use a dedicated least-privilege database user.
+### Backend on Render
 
-Important: a free Render web service may sleep when inactive. In-process `node-cron` cannot run while the service is asleep, so production-grade 8 AM delivery requires an always-running instance or an external scheduled service.
+Create a Render Web Service connected to this repository:
 
-### Vercel frontend
+```text
+Root directory: backend
+Build command: npm install
+Start command: npm start
+```
 
-- Root directory: `frontend`
-- Build command: `npm run build`
-- Output directory: `dist`
-- Set `VITE_API_URL` to `https://YOUR-RENDER-SERVICE.onrender.com/api`.
+Add the backend environment variables, using your MongoDB Atlas connection
+string. Set `FRONTEND_URL` to the final Vercel URL.
 
-After Vercel gives the final URL, update Render's `FRONTEND_URL` and redeploy the backend.
+Copy the Render service URL and configure the Vercel project:
+
+```text
+VITE_API_URL=https://your-render-service.onrender.com/api
+```
+
+In Vercel, open **Settings -> Environment Variables**, add the variable for
+the Production environment, save it, and redeploy. The frontend build embeds
+Vite variables at build time, so changing the variable without redeploying
+does not update the deployed website.
+
+### Frontend on Vercel
+
+Import the same repository into Vercel:
+
+```text
+Root directory: frontend
+Build command: npm run build
+Output directory: dist
+```
+
+Set:
+
+```env
+VITE_API_URL=https://your-render-service.onrender.com/api
+```
+
+After deployment, copy the Vercel URL back into Render's `FRONTEND_URL` and
+redeploy the backend.
+
+Free hosting services may sleep when inactive. In-process scheduled jobs
+should therefore not be relied on for production-critical reminders unless the
+backend uses an always-on instance or an external scheduler.
+
+## Useful commands
+
+From `backend/`:
+
+```powershell
+npm run dev       # MongoDB API with nodemon
+npm start         # MongoDB API
+npm run demo      # In-memory demo API
+npm run seed:demo # Seed demo records into MongoDB
+```
+
+From `frontend/`:
+
+```powershell
+npm run dev       # Vite development server
+npm run build     # Production build
+npm run preview   # Preview the production build locally
+```
+
+## Security notes
+
+- Use a strong, unique `JWT_SECRET` in production.
+- Restrict MongoDB Atlas Network Access whenever possible.
+- Use a least-privilege MongoDB user.
+- Do not commit `.env` files.
+- Replace all demo credentials before using the project with real users.
+- Configure the production frontend origin in `FRONTEND_URL`.
+
+## Technology stack
+
+- React 19
+- Vite
+- React Router
+- Axios
+- Recharts
+- jsPDF
+- Node.js
+- Express
+- MongoDB and Mongoose
+- JWT
+- bcryptjs
+- node-cron
+
+## License
+
+This project is currently maintained as a private application repository. Add
+the appropriate license before distributing it publicly.

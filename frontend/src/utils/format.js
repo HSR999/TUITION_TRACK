@@ -13,7 +13,10 @@ export const today = () => new Date().toISOString().slice(0, 10);
 
 export const getErrorMessage = (error) => {
   if (error.code === "ERR_NETWORK") {
-    return "Network error: backend server is not reachable. Start backend on port 5000 and check MongoDB Atlas connection.";
+    const isDeployed = typeof window !== "undefined" && window.location.hostname !== "localhost";
+    return isDeployed
+      ? "The deployed frontend cannot reach its API. Set VITE_API_URL in Vercel to your public backend URL ending in /api, then redeploy."
+      : "Network error: backend server is not reachable. Start backend on port 5000 and check MongoDB Atlas connection.";
   }
   return error.response?.data?.message || error.message || "Something went wrong";
 };
