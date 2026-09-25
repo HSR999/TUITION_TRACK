@@ -20,7 +20,9 @@ export default function Navbar() {
       <div className="flex h-full flex-col">
         <div className="flex items-center justify-between px-6 py-6">
           <AppIcon name="logo" className="brand-mark h-14 w-14 lg:h-16 lg:w-16" />
-          <button onClick={logout} className="text-xs font-semibold text-slate-500 lg:hidden">Logout</button>
+          <button type="button" onClick={logout} className="mobile-logout" aria-label="Log out" title="Log out">
+            <AppIcon name="logout" className="h-5 w-5" />
+          </button>
         </div>
 
         <nav className="sidebar-nav flex gap-2 px-4 pb-4 lg:flex-1 lg:flex-col">
@@ -37,7 +39,7 @@ export default function Navbar() {
               }`}
             >
               <AppIcon name={icon} className="nav-icon h-6 w-6" />
-              <span className="lg:hidden">{label}</span>
+              <span className="nav-label">{label}</span>
             </NavLink>
           ))}
         </nav>

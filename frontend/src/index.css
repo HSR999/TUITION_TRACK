@@ -241,14 +241,32 @@ button { cursor: pointer; }
   .reference-account { margin-top: 0; }
 }
 @media (max-width: 620px) {
-  .reference-dashboard { padding-inline: 0.25rem; }
-  .reference-header { align-items: flex-start; flex-direction: column; }
-  .reference-search { width: min(100%, 16rem); }
-  .reference-grid { gap: 1.2rem; }
+  body { font-size: 0.88rem; }
+  h1, .text-4xl { font-size: 1.55rem !important; }
+  h2, .text-3xl { font-size: 1.2rem !important; }
+  h3, .text-2xl { font-size: 1.05rem !important; }
+  .text-xl { font-size: 0.98rem !important; }
+  .text-lg { font-size: 0.9rem !important; }
+  .reference-dashboard { padding: 0 0.1rem 1rem; }
+  .reference-header { align-items: center; flex-direction: row; margin-bottom: 1rem; }
+  .reference-kicker { font-size: 0.58rem; }
+  .reference-header h1 { font-size: 1.45rem; }
+  .reference-search { width: min(100%, 12rem); }
+  .reference-grid { gap: 0.9rem; }
   .activity-grid, .progress-grid { grid-template-columns: 1fr; }
-  .progress-card { min-height: 5.2rem; }
+  .progress-card { min-height: 4.5rem; }
   .reference-side-column { display: block; }
   .schedule-card, .reference-account { margin-top: 0.7rem; }
+  .reference-section-heading { margin-bottom: 0.5rem; }
+  .reference-section-heading h2 { font-size: 1.15rem; }
+  .reference-section-heading > span { font-size: 0.95rem; }
+  .activity-card { min-height: 9rem; padding: 1rem; }
+  .activity-card strong { font-size: 0.95rem; }
+  .activity-card small, .progress-card span { font-size: 0.72rem; }
+  .progress-card { padding: 0.85rem; }
+  .progress-card strong { font-size: 1.65rem; }
+  .course-card, .schedule-card, .reference-account, .calendar-card { padding: 0.85rem; }
+  .reference-report { padding: 0.9rem; }
 }
 .table-wrap { @apply overflow-x-auto; }
 th { @apply px-4 py-3 text-left text-xs font-semibold uppercase tracking-[0.12em] text-slate-500; background: rgba(241, 245, 249, 0.72); }
@@ -318,6 +336,18 @@ tbody tr { @apply transition hover:bg-teal-50/40; }
   box-shadow: 0 0 0 5px rgba(99, 102, 241, 0.1);
 }
 .profile-control { border: 0; color: inherit; font: inherit; text-align: left; }
+.mobile-logout {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border: 0;
+  border-radius: 0.75rem;
+  background: #fff1f2;
+  color: #dc2626;
+}
+.nav-label { display: none; }
 @media (min-width: 900px) {
   .nav-item[data-label]::before {
     content: attr(data-label);
@@ -389,8 +419,35 @@ tbody tr { @apply transition hover:bg-teal-50/40; }
 }
 
 @media (max-width: 899px) {
-  .sidebar-shell { border-bottom: 1px solid var(--line); background: rgba(255, 255, 255, 0.86); }
-  .sidebar-nav { overflow-x: auto; }
+  .sidebar-shell {
+    position: sticky;
+    top: 0;
+    border-bottom: 1px solid var(--line);
+    background: rgba(255, 255, 255, 0.9);
+    box-shadow: 0 8px 22px rgba(15, 23, 42, 0.06);
+    backdrop-filter: blur(18px);
+  }
+  .sidebar-shell > div { height: auto; }
+  .sidebar-shell > div > div:first-child { padding: 0.65rem 0.85rem; }
+  .sidebar-shell .brand-mark { width: 2.5rem; height: 2.5rem; border-radius: 0.7rem; }
+  .mobile-logout { display: inline-flex; }
+  .sidebar-nav {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 0.2rem;
+    overflow: visible;
+    padding: 0 0.55rem 0.55rem;
+  }
+  .sidebar-nav a {
+    justify-content: center;
+    min-width: 0;
+    padding: 0.55rem 0.2rem;
+    border-radius: 0.7rem;
+  }
+  .sidebar-nav .nav-icon { width: 1.25rem; height: 1.25rem; }
+  .sidebar-nav .nav-item.active::after { right: 50%; bottom: 0.18rem; transform: translateX(50%); }
+  .app-main { padding: 0.75rem 0.7rem !important; }
+  .app-main > .float-panel > div:first-child { display: none; }
 }
 
 @keyframes float-in {
