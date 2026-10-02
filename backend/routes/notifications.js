@@ -10,6 +10,66 @@ const { getCreateOwnership, withDataScope } = require("../utils/access");
 const router = express.Router();
 router.use(protect);
 
+const isSupportedPushEndpoint = (endpoint) => {
+  try {
+    const url = new URL(endpoint);
+    const host = url.hostname.toLowerCase();
+    return url.protocol === "https:"
+      && (host === "fcm.googleapis.com"
+        || host === "push.services.mozilla.com"
+        || host === "updates.push.services.mozilla.com"
+        || host === "web.push.apple.com"
+        || host.endsWith(".notify.windows.com"));
+  } catch {
+    return false;
+  }
+};
+
+router.get("/push/status", (req, res) => {
+  res.json({
+    available: Boolean(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY),
+    subscriptionEndpoints: (req.teacher.pushSubscriptions || []).map(({ endpoint }) => endpoint),
+    publicKey: process.env.VAPID_PUBLIC_KEY || null,
+  });
+});
+
+router.post("/push/subscribe", async (req, res) => {
+  try {
+    const { endpoint, keys } = req.body || {};
+    if (typeof endpoint !== "string" || !isSupportedPushEndpoint(endpoint)
+      || typeof keys?.p256dh !== "string" || typeof keys?.auth !== "string"
+      || keys.p256dh.length > 256 || keys.auth.length > 256) {
+      return res.status(400).json({ message: "A valid browser push subscription is required" });
+    }
+    if (!process.env.VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY) {
+      return res.status(503).json({ message: "Phone notifications are not configured on the server yet" });
+    }
+
+    await req.teacher.updateOne({
+      $pull: { pushSubscriptions: { endpoint } },
+    });
+    await req.teacher.updateOne({
+      $push: { pushSubscriptions: { endpoint, keys, createdAt: new Date() } },
+    });
+    res.status(201).json({ message: "Phone notifications enabled on this device" });
+  } catch (error) {
+    res.status(500).json({ message: "Could not enable phone notifications", error: error.message });
+  }
+});
+
+router.delete("/push/subscribe", async (req, res) => {
+  try {
+    const { endpoint } = req.body || {};
+    if (typeof endpoint !== "string" || !endpoint) {
+      return res.status(400).json({ message: "A push subscription endpoint is required" });
+    }
+    await req.teacher.updateOne({ $pull: { pushSubscriptions: { endpoint } } });
+    res.json({ message: "Phone notifications disabled on this device" });
+  } catch (error) {
+    res.status(500).json({ message: "Could not disable phone notifications", error: error.message });
+  }
+});
+
 router.get("/", async (req, res) => {
   try {
     const filters = {};

@@ -2,6 +2,15 @@
 const mongoose =require("mongoose");
 const bcrypt = require("bcryptjs");
 
+const pushSubscriptionSchema = new mongoose.Schema({
+  endpoint: { type: String, required: true },
+  keys: {
+    p256dh: { type: String, required: true },
+    auth: { type: String, required: true },
+  },
+  createdAt: { type: Date, default: Date.now },
+}, { _id: false });
+
 const teacherSchema = new mongoose.Schema({
     instituteId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -49,6 +58,12 @@ const teacherSchema = new mongoose.Schema({
       overdue: { type: String, default: "" },
       partial: { type: String, default: "" },
       manual: { type: String, default: "" },
+    },
+
+    pushSubscriptions: {
+      type: [pushSubscriptionSchema],
+      default: [],
+      select: false,
     },
   },
   {

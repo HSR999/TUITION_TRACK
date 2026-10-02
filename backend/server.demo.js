@@ -274,6 +274,16 @@ app.get("/api/notifications", requireDemoAuth, (req, res) => {
   res.json({ notifications: notifications.filter((item) => item.month === month) });
 });
 
+app.get("/api/notifications/push/status", requireDemoAuth, (req, res) => {
+  res.json({ available: false, subscriptionEndpoints: [], publicKey: null });
+});
+app.post("/api/notifications/push/subscribe", requireDemoAuth, (req, res) => {
+  res.status(503).json({ message: "Phone push notifications require the production backend and VAPID configuration" });
+});
+app.delete("/api/notifications/push/subscribe", requireDemoAuth, (req, res) => {
+  res.status(503).json({ message: "Phone push notifications require the production backend and VAPID configuration" });
+});
+
 app.get("/api/notifications/reminder-queue", requireDemoAuth, (req, res) => {
   const month = req.query.month || currentMonth();
   const currentFees = fees.filter((fee) => fee.month === month);

@@ -1,0 +1,17 @@
+{
+  "name": "TuitionTrack",
+  "short_name": "TuitionTrack",
+  "description": "Tuition management for teachers and coaching institutes",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f4f7fb",
+  "theme_color": "#0f766e",
+  "icons": [
+    {
+      "src": "/icons/logo.png",
+      "sizes": "any",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

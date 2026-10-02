@@ -22,7 +22,10 @@ const protect = async (req, res, next) => {
       process.env.JWT_SECRET
     );
 
-    const teacher = await Teacher.findById(decodedToken.id).populate("instituteId", "name logoUrl phone address");
+    const teacherQuery = Teacher.findById(decodedToken.id)
+      .populate("instituteId", "name logoUrl phone address");
+    if (req.path === "/push/status") teacherQuery.select("+pushSubscriptions");
+    const teacher = await teacherQuery;
 
     if (!teacher) {
       return res.status(401).json({

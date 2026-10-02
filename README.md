@@ -198,6 +198,9 @@ Use `npm run demo` instead if you want an in-memory preview with no database.
 | `JWT_EXPIRES_IN` | JWT lifetime, for example `7d` |
 | `FRONTEND_URL` | Allowed frontend origin for CORS |
 | `UPCOMING_REMINDER_DAYS` | Days before a fee due date to include in reminders |
+| `VAPID_PUBLIC_KEY` | Public key used by browser push subscriptions |
+| `VAPID_PRIVATE_KEY` | Private server key used to send push notifications; keep secret |
+| `VAPID_SUBJECT` | Contact URI for push providers, e.g. `mailto:admin@example.com` |
 
 ### Frontend
 
@@ -297,6 +300,42 @@ redeploy the backend.
 Free hosting services may sleep when inactive. In-process scheduled jobs
 should therefore not be relied on for production-critical reminders unless the
 backend uses an always-on instance or an external scheduler.
+
+## Phone push notifications
+
+Teachers can enable **Daily fee summary at 8:00 AM** from the Notifications
+page. A subscribed device receives a push alert with the number of students
+with outstanding fees, overdue count, and total due, even when the app is
+closed. Each phone/browser must be subscribed separately. Push alerts are sent
+only when there are outstanding fees.
+
+### Configure push on Render
+
+Generate a VAPID key pair from the backend directory:
+
+```powershell
+cd backend
+npx web-push generate-vapid-keys
+```
+
+In Render's backend environment settings, add the generated values:
+
+```text
+VAPID_PUBLIC_KEY=<generated public key>
+VAPID_PRIVATE_KEY=<generated private key>
+VAPID_SUBJECT=mailto:admin@your-domain.com
+```
+
+Keep `VAPID_PRIVATE_KEY` secret and never put it in Vercel or a `VITE_`
+variable. Redeploy the backend after setting these values and redeploy Vercel
+after the frontend changes. The app must be opened over HTTPS. On Android,
+allow notifications in the browser and optionally install the app from the
+browser menu. On iPhone/iPad, add the website to the Home Screen and enable
+notifications from the installed web app (iOS/iPadOS 16.4 or later).
+
+The in-process 8:00 AM scheduler requires the Render service to be running.
+If the service sleeps on a free plan, use an always-on backend or an external
+scheduler for dependable daily delivery.
 
 ## Useful commands
 

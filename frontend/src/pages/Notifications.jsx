@@ -18,6 +18,21 @@ export default function Notifications() {
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [template, setTemplate] = useState(getMessageTemplate);
+  const [pushStatus, setPushStatus] = useState(null);
+  const [pushBusy, setPushBusy] = useState(false);
+
+  useEffect(() => {
+    api.get("/notifications/push/status")
+      .then(async ({ data }) => {
+        const registration = await navigator.serviceWorker.ready;
+        const subscription = await registration.pushManager.getSubscription();
+        setPushStatus({
+          ...data,
+          subscribed: Boolean(subscription && data.subscriptionEndpoints?.includes(subscription.endpoint)),
+        });
+      })
+      .catch((err) => setError(getErrorMessage(err)));
+  }, []);
 
   const load = async () => {
     try {
@@ -57,6 +72,53 @@ export default function Notifications() {
     localStorage.setItem("tuitiontrack_message_template", value);
   };
 
+  const setPhoneNotifications = async () => {
+    if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
+      setError("This browser does not support phone push notifications. Try installing TuitionTrack from Chrome or Safari.");
+      return;
+    }
+
+    setPushBusy(true);
+    setError("");
+    try {
+      if (pushStatus?.subscribed) {
+        const registration = await navigator.serviceWorker.ready;
+        const subscription = await registration.pushManager.getSubscription();
+        if (subscription) {
+          await api.delete("/notifications/push/subscribe", { data: { endpoint: subscription.endpoint } });
+          await subscription.unsubscribe();
+        }
+        setPushStatus((status) => ({ ...status, subscribed: false }));
+        toast("Phone notifications disabled on this device");
+        return;
+      }
+
+      if (Notification.permission === "denied") {
+        throw new Error("Notifications are blocked in browser settings. Allow notifications for this site, then try again.");
+      }
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") throw new Error("Allow notifications to enable fee alerts.");
+      if (!pushStatus?.publicKey) throw new Error("Phone notifications are not configured on the server yet.");
+
+      const registration = await navigator.serviceWorker.ready;
+      const applicationServerKey = Uint8Array.from(
+        atob(pushStatus.publicKey.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(pushStatus.publicKey.length / 4) * 4, "=")),
+        (character) => character.charCodeAt(0)
+      );
+      const subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey,
+      });
+      await api.post("/notifications/push/subscribe", subscription.toJSON());
+      setPushStatus((status) => ({ ...status, subscribed: true }));
+      toast("Daily fee notifications enabled on this device");
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setPushBusy(false);
+    }
+  };
+
   const markHandled = async (id) => {
     try {
       await api.patch(`/notifications/${id}/handled`);
@@ -78,6 +140,29 @@ export default function Notifications() {
 
       {notice && <Alert type="success">{notice}</Alert>}
       {error && <Alert type="error">{error}</Alert>}
+
+      <section className="card mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-brand-700">Phone push notifications</p>
+          <h2 className="mt-1 font-black text-slate-900">Daily fee summary at 8:00 AM</h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Get pending and overdue fee alerts on this device, even when TuitionTrack is closed.
+            Enable once on every phone or browser you want to notify.
+          </p>
+        </div>
+        <button
+          type="button"
+          className={pushStatus?.subscribed ? "btn-secondary shrink-0" : "btn-primary shrink-0"}
+          onClick={setPhoneNotifications}
+          disabled={pushBusy || !pushStatus?.available}
+          title={!pushStatus?.available ? "Server push notifications need VAPID keys configured" : undefined}
+        >
+          {pushBusy ? "Please wait..." : pushStatus?.subscribed ? "Disable on this device" : "Enable on this device"}
+        </button>
+        {!pushStatus?.available && (
+          <p className="text-xs text-amber-700 sm:max-w-48">Push setup is pending server configuration.</p>
+        )}
+      </section>
 
       <section className="card mb-6 p-5">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
