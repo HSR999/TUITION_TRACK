@@ -30,10 +30,7 @@ export function AuthProvider({ children }) {
   };
 
   const login = (form) => authenticate("login", form);
-  const register = async (form) => {
-    await api.post("/auth/register", form);
-    return authenticate("login", { email: form.email, password: form.password });
-  };
+  const register = async (form) => api.post("/auth/register", form);
   const logout = () => {
     localStorage.removeItem("tuitiontrack_token");
     localStorage.removeItem("tuitiontrack_teacher");

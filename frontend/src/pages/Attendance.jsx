@@ -5,6 +5,7 @@ import EmptyState from "../components/EmptyState";
 import LoadingState from "../components/LoadingState";
 import PageHeader from "../components/PageHeader";
 import { getErrorMessage, today } from "../utils/format";
+import { getClassOptions } from "../utils/classes";
 import { useToast } from "../context/ToastContext";
 
 export default function Attendance() {
@@ -12,6 +13,7 @@ export default function Attendance() {
   const [date, setDate] = useState(today());
   const [classFilter, setClassFilter] = useState("");
   const [rows, setRows] = useState([]);
+  const [classOptions, setClassOptions] = useState([]);
   const [statuses, setStatuses] = useState({});
   const [notice, setNotice] = useState("");
   const [noticeType, setNoticeType] = useState("info");
@@ -32,6 +34,14 @@ export default function Attendance() {
   };
 
   useEffect(() => { load(); }, [date, classFilter]);
+  useEffect(() => {
+    api.get("/students")
+      .then(({ data }) => setClassOptions(getClassOptions(data.students)))
+      .catch((err) => {
+        setNoticeType("error");
+        setNotice(getErrorMessage(err));
+      });
+  }, []);
 
   const save = async () => {
     try {
@@ -59,7 +69,7 @@ export default function Attendance() {
         <input className="input w-auto" type="date" value={date} onChange={(event) => setDate(event.target.value)} />
         <select className="input w-auto" value={classFilter} onChange={(event) => setClassFilter(event.target.value)}>
           <option value="">All classes</option>
-          {["9", "10", "11"].map((item) => <option key={item} value={item}>Class {item}</option>)}
+          {classOptions.map((item) => <option key={item} value={item}>Class {item}</option>)}
         </select>
         <div className="rounded-2xl bg-white/80 px-4 py-2 text-sm font-semibold text-slate-600">
           Present {presentCount}/{rows.length}

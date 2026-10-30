@@ -24,12 +24,7 @@ const studentSchema = new mongoose.Schema(
       lowercase: true,
       trim: true,
     },
-    class: {
-      type: String,
-      required: true,
-      enum: ["9", "10", "11"],
-      index: true,
-    },
+    class: { type: String, required: true, trim: true, index: true },
     feeAmount: { type: Number, required: true, min: 0 },
     feeDueDate: { type: Number, required: true, min: 1, max: 31 },
     address: { type: String, trim: true, default: "" },

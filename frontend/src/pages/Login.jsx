@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
 import Alert from "../components/Alert";
 import AppIcon from "../components/AppIcon";
 import ShapeGrid from "../components/ShapeGrid";
@@ -8,9 +8,11 @@ import { getErrorMessage } from "../utils/format";
 
 export default function Login() {
   const { teacher, login, register } = useAuth();
+  const navigate = useNavigate();
   const [mode, setMode] = useState("login");
   const [form, setForm] = useState({ name: "", email: "", password: "" });
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   if (teacher) return <Navigate to="/" replace />;
@@ -18,10 +20,19 @@ export default function Login() {
   const submit = async (event) => {
     event.preventDefault();
     setError("");
+    setNotice("");
     setSubmitting(true);
 
     try {
-      await (mode === "login" ? login(form) : register(form));
+      if (mode === "login") {
+        await login(form);
+      } else {
+        await register(form);
+        setMode("login");
+        setForm({ name: "", email: form.email, password: "" });
+        setNotice("Your account is ready. Sign in with your new credentials.");
+        navigate("/login", { replace: true });
+      }
     } catch (err) {
       setError(getErrorMessage(err));
     } finally {
@@ -128,6 +139,7 @@ export default function Login() {
               </div>
 
               {error && <div className="mt-4"><Alert type="error">{error}</Alert></div>}
+              {notice && <div className="mt-4"><Alert type="success">{notice}</Alert></div>}
 
               <button className="btn-primary mt-6 w-full" disabled={submitting}>
                 {submitting ? "Please wait..." : mode === "login" ? "Sign in" : "Create account"}
@@ -148,6 +160,7 @@ export default function Login() {
                 onClick={() => {
                   setMode(mode === "login" ? "register" : "login");
                   setError("");
+                  setNotice("");
                 }}
               >
                 {mode === "login" ? "New to TuitionTrack? Create an account" : "Already registered? Sign in"}

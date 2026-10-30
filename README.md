@@ -68,6 +68,8 @@ stored in memory, so changes are reset when the demo API restarts.
 - **Dashboard:** student count, fee collection, pending dues, attendance,
   expenses, net profit, revenue trends, activity, and fee due calendar.
 - **Students:** add, edit, search, filter, and delete student records.
+- **Flexible classes:** add students to any class name; class tiles and filters
+  are generated from the classes that currently have enrolled students.
 - **Fees:** track paid, partial, and due amounts by month; record payments;
   generate receipt numbers; and open reminder actions.
 - **Attendance:** mark attendance by date and class.

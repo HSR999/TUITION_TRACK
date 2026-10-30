@@ -59,33 +59,33 @@ export default function Dashboard() {
       <div className="reference-grid">
         <section className="reference-main-column">
           <div className="reference-section-heading">
-            <h2>Your activities today</h2>
+            <h2>Your tuition at a glance</h2>
             <span>({data.month})</span>
           </div>
           <div className="activity-grid">
-            <ActivityCard to="/students" tone="mint" icon="students" title="Student directory" detail={`${stats.totalStudents} active students`} />
-            <ActivityCard to="/fees" tone="pink" icon="fees" title="Fee collection" detail={`${feeCollection.due} payments need attention`} />
+            <ActivityCard to="/students" tone="mint" icon="students" title="Manage students" detail={`${stats.totalStudents} currently enrolled`} />
+            <ActivityCard to="/fees" tone="pink" icon="fees" title="Track fee payments" detail={`${feeCollection.due} students have balances due`} />
           </div>
 
           <div className="reference-section-heading progress-heading">
-            <h2>Tuition health</h2>
+            <h2>Tuition snapshot</h2>
           </div>
           <div className="progress-grid">
-            <ProgressCard tone="mint" label="Paid fees" value={feeCollection.paid} detail="students cleared" to="/fees" />
-            <ProgressCard tone="yellow" label="Due fees" value={feeCollection.due} detail={formatCurrency(stats.pendingFees)} to="/notifications" />
-            <ProgressCard tone="lavender" label="Students" value={stats.totalStudents} detail={`${stats.avgAttendance}% attendance`} to="/students" />
+            <ProgressCard tone="mint" label="Paid this month" value={feeCollection.paid} detail="students fully paid" to="/fees" />
+            <ProgressCard tone="yellow" label="Outstanding" value={feeCollection.due} detail={`${formatCurrency(stats.pendingFees)} remaining`} to="/notifications" />
+            <ProgressCard tone="lavender" label="Enrolled students" value={stats.totalStudents} detail={`${stats.avgAttendance}% attendance`} to="/students" />
           </div>
 
           <Link to="/fees" className="course-card tone-yellow">
-            <div className="course-card-top"><span className="course-icon"><AppIcon name="fees" className="h-4 w-4" /></span><strong>Fee follow-up</strong><span className="circle-arrow">↗</span></div>
+            <div className="course-card-top"><span className="course-icon"><AppIcon name="fees" className="h-4 w-4" /></span><strong>Outstanding fee balance</strong></div>
             <p>{feeCollection.due} students have outstanding balances totalling {formatCurrency(stats.pendingFees)}</p>
             <div className="progress-track"><span style={{ width: `${Math.max(12, Math.round((feeCollection.paid / Math.max(stats.totalStudents, 1)) * 100))}%` }} /></div>
           </Link>
 
           <section className="reference-report card">
             <div className="reference-report-heading">
-              <div><h2>Revenue trend</h2><p>Six month collection overview</p></div>
-              <Link to="/fees" className="reference-link">View fees ↗</Link>
+              <div><h2>Monthly revenue</h2><p>Six month collection overview</p></div>
+              <Link to="/fees" className="reference-link">View fee records</Link>
             </div>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
@@ -102,7 +102,7 @@ export default function Dashboard() {
         </section>
 
         <aside className="reference-side-column">
-          <div className="reference-section-heading"><h2>Lesson schedule</h2></div>
+          <div className="reference-section-heading"><h2>Upcoming priorities</h2></div>
           <div className="calendar-card">
             <div className="calendar-title"><strong>{new Date(year, monthNumber - 1).toLocaleString("en-IN", { month: "long", year: "numeric" })}</strong><span>{dueDays.length} due</span></div>
             <div className="calendar-week">{monthDays.map((day) => <span key={day}>{day}</span>)}</div>
@@ -110,9 +110,9 @@ export default function Dashboard() {
             <p className="calendar-insight">{dueDays.includes(selectedDay) ? `Fee follow-up due on ${selectedDay} ${new Date(year, monthNumber - 1).toLocaleString("en-IN", { month: "short" })}.` : `No fee due recorded on ${selectedDay} ${new Date(year, monthNumber - 1).toLocaleString("en-IN", { month: "short" })}.`}</p>
           </div>
 
-          <Link to="/notifications" className="schedule-card tone-mint"><span className="schedule-icon"><AppIcon name="reminder" /></span><span>Follow up outstanding fee reminders</span><b>↗</b></Link>
-          <Link to="/attendance" className="schedule-card tone-lavender"><span className="schedule-icon"><AppIcon name="attendance" /></span><span>Review this month&apos;s attendance</span><b>↗</b></Link>
-          <Link to="/expenses" className="schedule-card tone-pink"><span className="schedule-icon"><AppIcon name="expenses" /></span><span>Check coaching expenses</span><b>↗</b></Link>
+          <Link to="/notifications" className="schedule-card tone-mint"><span className="schedule-icon"><AppIcon name="reminder" /></span><span>Follow up outstanding fees</span></Link>
+          <Link to="/attendance" className="schedule-card tone-lavender"><span className="schedule-icon"><AppIcon name="attendance" /></span><span>Review attendance</span></Link>
+          <Link to="/expenses" className="schedule-card tone-pink"><span className="schedule-icon"><AppIcon name="expenses" /></span><span>Review expenses</span></Link>
 
           <div className="reference-account card">
             <AppIcon name="teacher" className="h-10 w-10" />
@@ -125,9 +125,9 @@ export default function Dashboard() {
 }
 
 function ActivityCard({ to, tone, icon, title, detail }) {
-  return <Link to={to} className={`activity-card tone-${tone}`}><div className="activity-avatars"><AppIcon name={icon} className="h-8 w-8" /><span>+6</span></div><strong>{title}</strong><small>{detail}</small><span className="circle-arrow">↗</span></Link>;
+  return <Link to={to} className={`activity-card tone-${tone}`}><div className="activity-avatars"><AppIcon name={icon} className="h-8 w-8" /></div><strong>{title}</strong><small>{detail}</small></Link>;
 }
 
 function ProgressCard({ to, tone, label, value, detail }) {
-  return <Link to={to} className={`progress-card tone-${tone}`}><small>{label}</small><strong>{value}</strong><span>{detail}</span><span className="circle-arrow">↗</span></Link>;
+  return <Link to={to} className={`progress-card tone-${tone}`}><small>{label}</small><strong>{value}</strong><span>{detail}</span></Link>;
 }

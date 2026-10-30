@@ -7,6 +7,7 @@ import LoadingState from "../components/LoadingState";
 import PageHeader from "../components/PageHeader";
 import StudentModal from "../components/StudentModal";
 import { formatCurrency, getErrorMessage } from "../utils/format";
+import { getClassOptions } from "../utils/classes";
 import { useToast } from "../context/ToastContext";
 
 export default function Students() {
@@ -35,10 +36,11 @@ export default function Students() {
   useEffect(() => { load(); }, []);
 
   const visible = useMemo(() => students.filter((student) => (
-    (!selectedClass || student.class === selectedClass)
+    (!selectedClass || String(student.class).trim() === selectedClass)
     && [student.name, student.phone, student.parentName, student.parentPhone]
       .some((value) => value?.toLowerCase().includes(search.toLowerCase()))
   )), [students, selectedClass, search]);
+  const classes = useMemo(() => getClassOptions(students), [students]);
 
   const save = async (form) => {
     setSaving(true);
@@ -48,7 +50,7 @@ export default function Students() {
       setShowModal(false);
       setModal(null);
       toast(modal ? "Student updated successfully" : "Student added successfully");
-      load();
+      await load();
     } catch (err) {
       setError(getErrorMessage(err));
     } finally {
@@ -78,17 +80,17 @@ export default function Students() {
       <PageHeader title="Students" subtitle="Manage student and parent details" action={addButton} />
       {error && <Alert type="error">{error}</Alert>}
 
-      <div className="grid gap-3 sm:grid-cols-3">
-        {["9", "10", "11"].map((item) => (
+      {classes.length > 0 && <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        {classes.map((item) => (
           <ClassCard
             key={item}
             className={item}
-            count={students.filter((student) => student.class === item).length}
+            count={students.filter((student) => String(student.class).trim() === item).length}
             active={selectedClass === item}
             onClick={() => setSelectedClass(selectedClass === item ? "" : item)}
           />
         ))}
-      </div>
+      </div>}
 
       <div className="my-5 flex flex-col gap-3 sm:flex-row">
         <input className="input max-w-md" placeholder="Search student or parent..." value={search} onChange={(event) => setSearch(event.target.value)} />
@@ -127,7 +129,7 @@ export default function Students() {
         </div>
       )}
 
-      {showModal && <StudentModal student={modal} saving={saving} onClose={() => setShowModal(false)} onSave={save} />}
+      {showModal && <StudentModal student={modal} classOptions={classes} saving={saving} onClose={() => setShowModal(false)} onSave={save} />}
     </>
   );
 }

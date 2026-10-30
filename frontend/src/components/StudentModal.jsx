@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 
 const emptyForm = {
   name: "", phone: "", parentName: "", parentPhone: "", parentEmail: "",
-  class: "9", feeAmount: "", feeDueDate: "5", address: "",
+  class: "", feeAmount: "", feeDueDate: "5", address: "",
 };
 
 const fields = [
@@ -15,7 +15,7 @@ const fields = [
   ["feeDueDate", "Due day (1-31)", "number", true],
 ];
 
-export default function StudentModal({ student, onClose, onSave, saving }) {
+export default function StudentModal({ student, classOptions = [], onClose, onSave, saving }) {
   const [form, setForm] = useState(emptyForm);
 
   useEffect(() => setForm(student ? { ...emptyForm, ...student } : emptyForm), [student]);
@@ -57,9 +57,18 @@ export default function StudentModal({ student, onClose, onSave, saving }) {
 
           <label>
             <span className="label">Class</span>
-            <select className="input" name="class" value={form.class} onChange={update}>
-              {["9", "10", "11"].map((item) => <option key={item} value={item}>Class {item}</option>)}
-            </select>
+            <input
+              className="input"
+              name="class"
+              value={form.class}
+              onChange={update}
+              list="student-class-options"
+              placeholder="Choose an existing class or type a new one"
+              required
+            />
+            <datalist id="student-class-options">
+              {classOptions.map((item) => <option key={item} value={item} />)}
+            </datalist>
           </label>
 
           <label className="sm:col-span-2">

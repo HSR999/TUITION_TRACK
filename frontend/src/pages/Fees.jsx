@@ -10,6 +10,7 @@ import StatusBadge from "../components/StatusBadge";
 import { currentMonth, formatCurrency, getErrorMessage } from "../utils/format";
 import { useAuth } from "../context/AuthContext";
 import { getMessageTemplate, renderReminderMessage } from "../utils/reminders";
+import { getClassOptions } from "../utils/classes";
 import { useToast } from "../context/ToastContext";
 
 export default function Fees() {
@@ -18,6 +19,7 @@ export default function Fees() {
   const [month, setMonth] = useState(currentMonth());
   const [classFilter, setClassFilter] = useState("");
   const [fees, setFees] = useState([]);
+  const [classOptions, setClassOptions] = useState([]);
   const [amounts, setAmounts] = useState({});
   const [view, setView] = useState("list");
   const [receipt, setReceipt] = useState(null);
@@ -40,6 +42,11 @@ export default function Fees() {
   };
 
   useEffect(() => { load(); }, [month, classFilter]);
+  useEffect(() => {
+    api.get("/students")
+      .then(({ data }) => setClassOptions(getClassOptions(data.students)))
+      .catch((err) => setError(getErrorMessage(err)));
+  }, []);
 
   const save = async (item) => {
     setError("");
@@ -90,7 +97,7 @@ export default function Fees() {
         <input className="input w-auto" type="month" value={month} onChange={(event) => setMonth(event.target.value)} />
         <select className="input w-auto" value={classFilter} onChange={(event) => setClassFilter(event.target.value)}>
           <option value="">All classes</option>
-          {["9", "10", "11"].map((item) => <option key={item} value={item}>Class {item}</option>)}
+          {classOptions.map((item) => <option key={item} value={item}>Class {item}</option>)}
         </select>
         <button className="btn-secondary" onClick={() => setView(view === "list" ? "calendar" : "list")}>
           {view === "list" ? "Calendar view" : "List view"}
