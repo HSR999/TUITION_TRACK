@@ -20,7 +20,9 @@ export default function Fees() {
   const [classFilter, setClassFilter] = useState("");
   const [fees, setFees] = useState([]);
   const [classOptions, setClassOptions] = useState([]);
-  const [amounts, setAmounts] = useState({});
+  const [paymentAmounts, setPaymentAmounts] = useState({});
+  const [paymentMethod, setPaymentMethod] = useState("other");
+  const [savingStudentId, setSavingStudentId] = useState(null);
   const [view, setView] = useState("list");
   const [receipt, setReceipt] = useState(null);
   const [message, setMessage] = useState("");
@@ -33,7 +35,7 @@ export default function Fees() {
       setError("");
       const { data } = await api.get("/fees", { params: { month, class: classFilter || undefined } });
       setFees(data.fees);
-      setAmounts(Object.fromEntries(data.fees.map((item) => [item.student._id, item.record.amountPaid])));
+      setPaymentAmounts(Object.fromEntries(data.fees.map((item) => [item.student._id, ""])));
     } catch (err) {
       setError(getErrorMessage(err));
     } finally {
@@ -49,16 +51,23 @@ export default function Fees() {
   }, []);
 
   const save = async (item) => {
+    if (savingStudentId) return;
     setError("");
     setMessage("");
+    setSavingStudentId(item.student._id);
     try {
-      const { data } = await api.put(`/fees/${item.student._id}/${month}`, { amountPaid: Number(amounts[item.student._id] || 0) });
-      setMessage("Fee saved successfully");
-      toast("Fee payment saved successfully");
-      load();
-      if (data.record.amountPaid > 0) setReceipt({ student: data.student, record: data.record });
+      const { data } = await api.post(`/fees/${item.student._id}/${month}/payments`, {
+        amount: Number(paymentAmounts[item.student._id]),
+        method: paymentMethod,
+      });
+      setMessage("Payment recorded successfully");
+      toast("Payment recorded successfully");
+      await load();
+      setReceipt({ student: data.student, record: data.payment });
     } catch (err) {
       setError(getErrorMessage(err));
+    } finally {
+      setSavingStudentId(null);
     }
   };
 
@@ -99,6 +108,12 @@ export default function Fees() {
           <option value="">All classes</option>
           {classOptions.map((item) => <option key={item} value={item}>Class {item}</option>)}
         </select>
+        <select className="input w-auto" value={paymentMethod} onChange={(event) => setPaymentMethod(event.target.value)} aria-label="Payment method">
+          <option value="other">Payment method</option>
+          <option value="cash">Cash</option>
+          <option value="upi">UPI</option>
+          <option value="bank_transfer">Bank transfer</option>
+        </select>
         <button className="btn-secondary" onClick={() => setView(view === "list" ? "calendar" : "list")}>
           {view === "list" ? "Calendar view" : "List view"}
         </button>
@@ -114,7 +129,7 @@ export default function Fees() {
         <div className="table-wrap">
           <table className="w-full">
             <thead>
-              <tr><th>Student</th><th>Fee</th><th>Paid total</th><th>Status</th><th>Actions</th></tr>
+              <tr><th>Student</th><th>Fee</th><th>Paid total</th><th>New payment</th><th>Status</th><th>History</th><th>Actions</th></tr>
             </thead>
             <tbody>
               {fees.map((item) => (
@@ -124,22 +139,26 @@ export default function Fees() {
                     <p className="text-xs text-slate-400">Class {item.student.class} · Due day {item.student.feeDueDate}</p>
                   </td>
                   <td>{formatCurrency(item.student.feeAmount)}</td>
+                  <td>{formatCurrency(item.record.amountPaid || 0)}</td>
                   <td>
                     <input
                       className="input w-32"
                       type="number"
-                      min="0"
-                      max={item.student.feeAmount}
-                      value={amounts[item.student._id] ?? 0}
-                      onChange={(event) => setAmounts({ ...amounts, [item.student._id]: event.target.value })}
+                      min="0.01"
+                      max={Math.max(item.student.feeAmount - Number(item.record.amountPaid || 0), 0)}
+                      step="0.01"
+                      value={paymentAmounts[item.student._id] ?? ""}
+                      onChange={(event) => setPaymentAmounts({ ...paymentAmounts, [item.student._id]: event.target.value })}
+                      aria-label={`New payment for ${item.student.name}`}
                     />
                   </td>
                   <td><StatusBadge status={item.record.status} /></td>
+                  <td>{item.payments.length} payment{item.payments.length === 1 ? "" : "s"}</td>
                   <td>
                     <div className="flex flex-wrap gap-2">
-                      <button className="btn-primary !px-3 !py-2" onClick={() => save(item)}>Save</button>
+                      <button className="btn-primary !px-3 !py-2" onClick={() => save(item)} disabled={savingStudentId !== null || !paymentAmounts[item.student._id] || Number(paymentAmounts[item.student._id]) <= 0 || Number(paymentAmounts[item.student._id]) > item.student.feeAmount - Number(item.record.amountPaid || 0)}>{savingStudentId === item.student._id ? "Recording..." : "Record"}</button>
                       <button className="btn-secondary !px-3 !py-2" onClick={() => remind(item)}>WhatsApp</button>
-                      {item.record.receiptNumber && <button className="font-semibold text-brand-700" onClick={() => setReceipt(item)}>Receipt</button>}
+                      {item.payments[0] && <button className="font-semibold text-brand-700" onClick={() => setReceipt({ student: item.student, record: item.payments[0] })}>Latest receipt</button>}
                     </div>
                   </td>
                 </tr>

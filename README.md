@@ -67,22 +67,38 @@ stored in memory, so changes are reset when the demo API restarts.
 
 - **Dashboard:** student count, fee collection, pending dues, attendance,
   expenses, net profit, revenue trends, activity, and fee due calendar.
-- **Students:** add, edit, search, filter, and delete student records.
+- **Students:** add, edit, search, filter, archive, and restore student records.
+  Archiving preserves attendance, fees, and notification history.
+  Student phone is optional; parent phone is required. Phone values remain
+  strings so country codes and leading zeros are preserved.
 - **Flexible classes:** add students to any class name; class tiles and filters
   are generated from the classes that currently have enrolled students.
-- **Fees:** track paid, partial, and due amounts by month; record payments;
-  generate receipt numbers; and open reminder actions.
-- **Attendance:** mark attendance by date and class.
+- **Fees:** track paid, partial, and due amounts by month; append individual
+  payment transactions; generate a separate receipt for each payment; and open
+  reminder actions. Existing monthly totals remain visible as an imported
+  legacy payment because older installment details cannot be reconstructed.
+- **Attendance:** mark attendance by date and class. Past dates are read-only
+  in both the interface and API.
 - **Expenses:** manage monthly tuition-business expenses.
 - **Notifications:** review reminder history and delivery status.
-- **Reminder studio:** customize parent messages with placeholders such as
+- **Reminder studio:** prepare WhatsApp messages for manual sending with placeholders such as
   `{studentName}`, `{parentName}`, `{amountDue}`, `{month}`, `{dueDate}`, and
   `{teacherName}`.
 - **Receipts:** create downloadable PDF payment receipts in the browser.
-- **Institute and team management:** manage institute information and team
-  access where enabled by the backend.
+- Team and institute-management screens are deferred; existing ownership data
+  remains in place for compatibility.
 - **Authentication:** JWT-based login, registration, protected routes, and
   logout.
+
+## Validation and dependency checks
+
+Run the backend's model and date/phone validation tests, and audit production
+dependencies, from the `backend/` directory:
+
+```powershell
+npm test
+npm audit --omit=dev
+```
 
 ## Project structure
 
@@ -112,8 +128,8 @@ Tuition_Track/
 
 ## Production local setup
 
-Production mode uses Express, MongoDB Atlas, JWT authentication, and the
-backend's configured reminder services.
+Production mode uses Express, MongoDB Atlas, JWT authentication, and scheduled
+phone push notifications. WhatsApp reminders are prepared for manual sending.
 
 ### 1. Configure the backend
 
@@ -222,10 +238,14 @@ GET    /api/dashboard
 GET    /api/students
 POST   /api/students
 PUT    /api/students/:id
-DELETE /api/students/:id
+PATCH  /api/students/:id/archive
+PATCH  /api/students/:id/restore
+DELETE /api/students/:id  (archive compatibility alias)
 
 GET    /api/fees
-PUT    /api/fees/:studentId/:month
+GET    /api/fees/transactions
+POST   /api/fees/:studentId/:month/payments
+PUT    /api/fees/:studentId/:month  (append-only compatibility adapter)
 
 GET    /api/attendance
 PUT    /api/attendance/mark

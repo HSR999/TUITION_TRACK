@@ -1,8 +1,10 @@
 const express = require("express");
 const cors = require("cors");
+const crypto = require("crypto");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+const { getIndiaDateKey, isValidDateKey, normalizePhone } = require("./utils/validation");
 
 app.use(cors());
 app.use(express.json());
@@ -14,8 +16,8 @@ const teacher = {
 };
 
 const now = new Date();
-const currentMonth = () => `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-const today = () => new Date().toISOString().slice(0, 10);
+const currentMonth = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit" }).format(new Date());
+const today = () => getIndiaDateKey();
 const makeId = (prefix) => `${prefix}-${Math.random().toString(36).slice(2, 10)}`;
 
 const previousMonths = (count) => {
@@ -70,9 +72,11 @@ let students = [
   feeDueDate,
   address: `Demo address ${index + 1}, Delhi`,
   joinedAt: new Date(now.getFullYear(), 0, index + 1).toISOString(),
+  isArchived: false,
 }));
 
 let fees = [];
+let payments = [];
 previousMonths(6).forEach((month, monthIndex) => {
   students.forEach((student, studentIndex) => {
     const isCurrent = month === currentMonth();
@@ -150,6 +154,82 @@ const requireDemoAuth = (req, res, next) => {
   next();
 };
 
+const getFeeRecord = (student, month) => {
+  let record = fees.find((fee) => fee.studentId === student._id && fee.month === month);
+  if (!record) {
+    record = {
+      _id: makeId("fee"),
+      teacherId: teacher._id,
+      studentId: student._id,
+      month,
+      amountPaid: 0,
+      amountDue: student.feeAmount,
+      status: "due",
+      paidOn: null,
+      receiptNumber: null,
+    };
+    fees.push(record);
+  }
+  return record;
+};
+
+const getLegacyPayment = (student, record) => ({
+  _id: `legacy-${record._id}`,
+  studentId: student._id,
+  month: record.month,
+  amount: record.amountPaid,
+  amountPaid: record.amountPaid,
+  paidAt: record.paidOn,
+  paidOn: record.paidOn,
+  receiptNumber: record.receiptNumber || `TT-LEGACY-${String(record._id).slice(-8).toUpperCase()}`,
+  method: "other",
+  status: record.status,
+  isLegacy: true,
+  note: "Imported from the existing monthly total; older payment breakdown is unavailable.",
+});
+
+const recordDemoPayment = (student, month, amount, method = "other", amountIsTotal = false) => {
+  const record = getFeeRecord(student, month);
+  const paymentAmount = amountIsTotal ? amount - Number(record.amountPaid || 0) : amount;
+  if (paymentAmount < -0.001) throw new Error("Recorded payments cannot be reduced");
+  if (paymentAmount <= 0.001) return { student, record, payment: null };
+  if (!Number.isFinite(paymentAmount) || Math.round(paymentAmount * 100) / 100 !== paymentAmount) {
+    throw new Error("Payment amount must have no more than two decimal places");
+  }
+  const roundedAmount = Math.round(paymentAmount * 100) / 100;
+  const newTotal = Math.round((Number(record.amountPaid || 0) + roundedAmount) * 100) / 100;
+  if (newTotal > student.feeAmount) throw new Error("Payment would exceed the monthly fee");
+
+  if (!payments.some((payment) => payment.studentId === student._id && payment.month === month) && record.amountPaid > 0) {
+    payments.push(getLegacyPayment(student, record));
+  }
+
+  const status = newTotal >= student.feeAmount ? "paid" : "partial";
+  const paidAt = new Date().toISOString();
+  const payment = {
+    _id: makeId("payment"),
+    studentId: student._id,
+    month,
+    amount: roundedAmount,
+    amountPaid: roundedAmount,
+    paidAt,
+    paidOn: paidAt,
+    receiptNumber: `TT-${month.replace("-", "")}-${crypto.randomBytes(4).toString("hex").toUpperCase()}`,
+    method,
+    status,
+    isLegacy: false,
+  };
+  payments.unshift(payment);
+  Object.assign(record, {
+    amountPaid: newTotal,
+    amountDue: student.feeAmount,
+    status,
+    paidOn: paidAt,
+    receiptNumber: payment.receiptNumber,
+  });
+  return { student, record, payment };
+};
+
 app.get("/", (req, res) => res.json({ message: "TuitionTrack Demo API is running" }));
 app.get("/api/health", (req, res) => res.json({ status: "ok", mode: "demo" }));
 
@@ -165,33 +245,87 @@ app.get("/api/auth/me", requireDemoAuth, (req, res) => res.json({ teacher }));
 app.get("/api/students", requireDemoAuth, (req, res) => {
   const search = String(req.query.search || "").toLowerCase();
   const filtered = students.filter((student) => (
-    (!req.query.class || student.class === req.query.class)
+    (req.query.includeArchived === "true" || !student.isArchived)
+    && (!req.query.class || student.class === req.query.class)
     && (!search || [student.name, student.phone, student.parentName, student.parentPhone].some((value) => value.toLowerCase().includes(search)))
   ));
   res.json({ students: filtered.sort((a, b) => a.class.localeCompare(b.class) || a.name.localeCompare(b.name)) });
 });
 
 app.post("/api/students", requireDemoAuth, (req, res) => {
-  const student = { ...req.body, _id: makeId("stu"), teacherId: teacher._id, joinedAt: new Date().toISOString() };
+  if (!req.body.name || !req.body.parentName || !req.body.parentPhone || !req.body.class
+    || !Number.isFinite(Number(req.body.feeAmount)) || Number(req.body.feeAmount) < 0
+    || !Number.isInteger(Number(req.body.feeDueDate)) || Number(req.body.feeDueDate) < 1 || Number(req.body.feeDueDate) > 31) {
+    return res.status(400).json({ message: "Student name, parent name and phone, class, fee, and due day are required" });
+  }
+  let student;
+  try {
+    student = {
+      ...req.body,
+      phone: normalizePhone(req.body.phone),
+      parentPhone: normalizePhone(req.body.parentPhone),
+      _id: makeId("stu"),
+      teacherId: teacher._id,
+      joinedAt: new Date().toISOString(),
+      isArchived: false,
+    };
+  } catch (error) {
+    return res.status(400).json({ message: error.message });
+  }
   students.push(student);
   res.status(201).json({ message: "Student added", student });
 });
 
 app.put("/api/students/:id", requireDemoAuth, (req, res) => {
-  students = students.map((student) => student._id === req.params.id ? { ...student, ...req.body } : student);
-  res.json({ message: "Student updated", student: students.find((student) => student._id === req.params.id) });
+  const student = students.find((item) => item._id === req.params.id && !item.isArchived);
+  if (!student) return res.status(404).json({ message: "Student not found" });
+  const editableFields = ["name", "phone", "parentName", "parentPhone", "parentEmail", "class", "feeAmount", "feeDueDate", "address", "joinedAt"];
+  const updates = Object.fromEntries(editableFields.filter((field) => req.body[field] !== undefined).map((field) => [field, req.body[field]]));
+  if (updates.name !== undefined && (typeof updates.name !== "string" || updates.name.trim().length < 2 || updates.name.trim().length > 100)) {
+    return res.status(400).json({ message: "Student name must be between 2 and 100 characters" });
+  }
+  if (updates.parentPhone !== undefined && !updates.parentPhone) return res.status(400).json({ message: "Parent phone is required" });
+  try {
+    if (updates.phone !== undefined) updates.phone = normalizePhone(updates.phone);
+    if (updates.parentPhone !== undefined) updates.parentPhone = normalizePhone(updates.parentPhone);
+  } catch (error) {
+    return res.status(400).json({ message: error.message });
+  }
+  Object.assign(student, updates);
+  return res.json({ message: "Student updated", student });
 });
 
-app.delete("/api/students/:id", requireDemoAuth, (req, res) => {
-  students = students.filter((student) => student._id !== req.params.id);
-  fees = fees.filter((fee) => fee.studentId !== req.params.id);
-  attendance = attendance.filter((item) => item.studentId !== req.params.id);
-  res.json({ message: "Student and related records deleted" });
+const updateArchiveStatus = (req, res, isArchived) => {
+  const student = students.find((item) => item._id === req.params.id);
+  if (!student) return res.status(404).json({ message: "Student not found" });
+  student.isArchived = isArchived;
+  student.archivedAt = isArchived ? new Date().toISOString() : null;
+  return res.json({ message: isArchived ? "Student archived" : "Student restored", student });
+};
+
+app.patch("/api/students/:id/archive", requireDemoAuth, (req, res) => updateArchiveStatus(req, res, true));
+app.patch("/api/students/:id/restore", requireDemoAuth, (req, res) => updateArchiveStatus(req, res, false));
+app.delete("/api/students/:id", requireDemoAuth, (req, res) => updateArchiveStatus(req, res, true));
+
+app.get("/api/fees/transactions", requireDemoAuth, (req, res) => {
+  const month = req.query.month || currentMonth();
+  const transactions = payments
+    .filter((payment) => payment.month === month)
+    .map((record) => ({ student: students.find((student) => student._id === record.studentId), record }))
+    .filter((item) => item.student);
+  fees.filter((record) => record.month === month && record.amountPaid > 0
+    && !payments.some((payment) => payment.studentId === record.studentId && payment.month === month))
+    .forEach((record) => {
+      const student = students.find((item) => item._id === record.studentId);
+      if (student) transactions.push({ student, record: getLegacyPayment(student, record) });
+    });
+  transactions.sort((left, right) => new Date(right.record.paidOn || 0) - new Date(left.record.paidOn || 0));
+  res.json({ month, transactions });
 });
 
 app.get("/api/fees", requireDemoAuth, (req, res) => {
   const month = req.query.month || currentMonth();
-  const filteredStudents = students.filter((student) => !req.query.class || student.class === req.query.class);
+  const filteredStudents = students.filter((student) => !student.isArchived && (!req.query.class || student.class === req.query.class));
   const feeRows = filteredStudents.map((student) => ({
     student,
     record: fees.find((fee) => fee.studentId === student._id && fee.month === month) || {
@@ -204,33 +338,56 @@ app.get("/api/fees", requireDemoAuth, (req, res) => {
       paidOn: null,
       receiptNumber: null,
     },
+    payments: (() => {
+      const history = payments.filter((payment) => payment.studentId === student._id && payment.month === month);
+      if (history.length) return history;
+      const existing = fees.find((fee) => fee.studentId === student._id && fee.month === month);
+      return existing?.amountPaid > 0 ? [getLegacyPayment(student, existing)] : [];
+    })(),
   }));
   res.json({ month, fees: feeRows });
 });
 
-app.put("/api/fees/:studentId/:month", requireDemoAuth, (req, res) => {
-  const student = students.find((item) => item._id === req.params.studentId);
-  if (!student) return res.status(404).json({ message: "Student not found" });
-  const amountPaid = Number(req.body.amountPaid || 0);
-  const status = amountPaid === 0 ? "due" : amountPaid >= student.feeAmount ? "paid" : "partial";
-  let record = fees.find((fee) => fee.studentId === student._id && fee.month === req.params.month);
-  if (!record) {
-    record = { _id: makeId("fee"), teacherId: teacher._id, studentId: student._id, month: req.params.month };
-    fees.push(record);
+app.post("/api/fees/:studentId/:month/payments", requireDemoAuth, (req, res) => {
+  const { month } = req.params;
+  const amount = Number(req.body.amount);
+  const method = req.body.method || "other";
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) return res.status(400).json({ message: "Month must use YYYY-MM format" });
+  if (!Number.isFinite(amount) || amount <= 0 || Math.abs(amount * 100 - Math.round(amount * 100)) > 1e-7) {
+    return res.status(400).json({ message: "Payment amount must be positive and have no more than two decimal places" });
   }
-  Object.assign(record, {
-    amountPaid,
-    amountDue: student.feeAmount,
-    status,
-    paidOn: amountPaid ? new Date().toISOString() : null,
-    receiptNumber: amountPaid ? `TT-${req.params.month.replace("-", "")}-${Date.now().toString().slice(-4)}` : null,
-  });
-  res.json({ message: "Fee record updated", record, student });
+  if (!["cash", "upi", "bank_transfer", "other"].includes(method)) return res.status(400).json({ message: "Payment method is not supported" });
+  const student = students.find((item) => item._id === req.params.studentId);
+  if (!student || student.isArchived) return res.status(404).json({ message: "Student not found" });
+  try {
+    const result = recordDemoPayment(student, month, amount, method);
+    return res.status(201).json({ message: "Payment recorded", ...result });
+  } catch (error) {
+    return res.status(400).json({ message: error.message });
+  }
+});
+
+app.put("/api/fees/:studentId/:month", requireDemoAuth, (req, res) => {
+  const month = req.params.month;
+  const amountPaid = Number(req.body.amountPaid);
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) return res.status(400).json({ message: "Month must use YYYY-MM format" });
+  if (!Number.isFinite(amountPaid) || amountPaid < 0 || Math.abs(amountPaid * 100 - Math.round(amountPaid * 100)) > 1e-7) {
+    return res.status(400).json({ message: "amountPaid must be a non-negative amount with no more than two decimal places" });
+  }
+  const student = students.find((item) => item._id === req.params.studentId && !item.isArchived);
+  if (!student) return res.status(404).json({ message: "Student not found" });
+  try {
+    const result = recordDemoPayment(student, month, amountPaid, "other", true);
+    return res.json({ message: result.payment ? "Payment recorded" : "Fee total unchanged", ...result });
+  } catch (error) {
+    return res.status(400).json({ message: error.message });
+  }
 });
 
 app.get("/api/attendance", requireDemoAuth, (req, res) => {
   const date = req.query.date || today();
-  const filteredStudents = students.filter((student) => !req.query.class || student.class === req.query.class);
+  if (!isValidDateKey(date)) return res.status(400).json({ message: "Date must be a real date in YYYY-MM-DD format" });
+  const filteredStudents = students.filter((student) => !student.isArchived && (!req.query.class || student.class === req.query.class));
   res.json({
     date,
     attendance: filteredStudents.map((student) => ({
@@ -241,6 +398,18 @@ app.get("/api/attendance", requireDemoAuth, (req, res) => {
 });
 
 app.put("/api/attendance/mark", requireDemoAuth, (req, res) => {
+  if (!isValidDateKey(req.body.date)) return res.status(400).json({ message: "A real date in YYYY-MM-DD format is required" });
+  if (req.body.date < today()) return res.status(403).json({ message: "Past attendance is read-only" });
+  if (!Array.isArray(req.body.records) || req.body.records.length === 0
+    || req.body.records.some((record) => !["present", "absent"].includes(record.status))) {
+    return res.status(400).json({ message: "A non-empty records array and valid attendance status are required" });
+  }
+  if (new Set(req.body.records.map((record) => record.studentId)).size !== req.body.records.length) {
+    return res.status(400).json({ message: "Attendance records cannot include duplicate students" });
+  }
+  if (req.body.records.some((record) => !students.some((student) => student._id === record.studentId && !student.isArchived))) {
+    return res.status(403).json({ message: "One or more students are invalid" });
+  }
   req.body.records.forEach((record) => {
     attendance = attendance.filter((item) => !(item.studentId === record.studentId && item.date === req.body.date));
     attendance.push({ _id: makeId("att"), teacherId: teacher._id, studentId: record.studentId, date: req.body.date, status: record.status });
@@ -271,7 +440,11 @@ app.delete("/api/expenses/:id", requireDemoAuth, (req, res) => {
 
 app.get("/api/notifications", requireDemoAuth, (req, res) => {
   const month = req.query.month || currentMonth();
-  res.json({ notifications: notifications.filter((item) => item.month === month) });
+  res.json({
+    notifications: notifications
+      .filter((item) => item.month === month)
+      .sort((left, right) => new Date(right.sentAt) - new Date(left.sentAt)),
+  });
 });
 
 app.get("/api/notifications/push/status", requireDemoAuth, (req, res) => {
@@ -286,15 +459,32 @@ app.delete("/api/notifications/push/subscribe", requireDemoAuth, (req, res) => {
 
 app.get("/api/notifications/reminder-queue", requireDemoAuth, (req, res) => {
   const month = req.query.month || currentMonth();
+  const [year, monthNumber] = month.split("-").map(Number);
+  const monthLength = new Date(Date.UTC(year, monthNumber, 0)).getUTCDate();
+  const todayKey = today();
   const currentFees = fees.filter((fee) => fee.month === month);
   const feeByStudent = new Map(currentFees.map((fee) => [fee.studentId, fee]));
-  const reminders = students
-    .map((student, index) => {
+  const latestStatusByStudent = new Map();
+  notifications
+    .filter((notification) => notification.month === month && notification.channel === "whatsapp_manual")
+    .forEach((notification) => {
+      const studentId = typeof notification.studentId === "string" ? notification.studentId : notification.studentId?._id;
+      if (studentId && !latestStatusByStudent.has(studentId)) latestStatusByStudent.set(studentId, notification.status);
+    });
+  const handledStudents = new Set([...latestStatusByStudent]
+    .filter(([, status]) => status === "handled")
+    .map(([studentId]) => studentId));
+  const reminders = students.filter((student) => !student.isArchived)
+    .map((student) => {
       const record = feeByStudent.get(student._id);
       const amountPaid = Number(record?.amountPaid || 0);
       const amountDue = Math.max(student.feeAmount - amountPaid, 0);
       if (amountDue <= 0 || record?.status === "paid") return null;
-      const type = record?.status === "partial" ? "partial" : index % 2 === 0 ? "overdue" : "upcoming_due";
+      const dueDay = Math.min(student.feeDueDate, monthLength);
+      const dueDateKey = `${month}-${String(dueDay).padStart(2, "0")}`;
+      const daysUntilDue = Math.round((Date.parse(`${dueDateKey}T00:00:00Z`) - Date.parse(`${todayKey}T00:00:00Z`)) / 86400000);
+      const type = record?.status === "partial" ? "partial" : daysUntilDue < 0 ? "overdue" : daysUntilDue <= 3 ? "upcoming_due" : null;
+      if (!type || handledStudents.has(student._id)) return null;
       return {
         studentId: student._id,
         studentName: student.name,
@@ -307,17 +497,18 @@ app.get("/api/notifications/reminder-queue", requireDemoAuth, (req, res) => {
         amountPaid,
         amountDue,
         type,
-        dueDate: new Date(now.getFullYear(), now.getMonth(), student.feeDueDate).toISOString(),
-        daysUntilDue: type === "overdue" ? -2 : 2,
+        dueDate: new Date(`${dueDateKey}T00:00:00.000Z`).toISOString(),
+        daysUntilDue,
         message: buildDemoReminder({ student, month, amountDue, type }),
       };
     })
-    .filter(Boolean);
+    .filter(Boolean)
+    .sort((left, right) => left.dueDate.localeCompare(right.dueDate) || left.studentName.localeCompare(right.studentName));
   res.json({ month, reminders });
 });
 
 app.post("/api/notifications/open/:studentId", requireDemoAuth, (req, res) => {
-  const student = students.find((item) => item._id === req.params.studentId);
+  const student = students.find((item) => item._id === req.params.studentId && !item.isArchived);
   if (!student) return res.status(404).json({ message: "Student not found" });
   const number = normalizePhoneNumber(student.parentPhone);
   const message = req.body.message || buildDemoReminder({
@@ -351,7 +542,7 @@ app.patch("/api/notifications/:id/handled", requireDemoAuth, (req, res) => {
 });
 
 app.post("/api/notifications/send/:studentId", requireDemoAuth, (req, res) => {
-  const student = students.find((item) => item._id === req.params.studentId);
+  const student = students.find((item) => item._id === req.params.studentId && !item.isArchived);
   if (!student) return res.status(404).json({ message: "Student not found" });
   const number = normalizePhoneNumber(student.parentPhone);
   const message = buildDemoReminder({
@@ -381,25 +572,34 @@ app.get("/api/dashboard", requireDemoAuth, (req, res) => {
   const month = currentMonth();
   const currentFees = fees.filter((fee) => fee.month === month);
   const monthlyRevenue = currentFees.reduce((sum, fee) => sum + fee.amountPaid, 0);
-  const expectedRevenue = students.reduce((sum, student) => sum + student.feeAmount, 0);
+  const activeStudents = students.filter((student) => !student.isArchived);
+  const activeIds = new Set(activeStudents.map((student) => student._id));
   const monthlyExpenses = expenses.filter((expense) => expense.date.startsWith(month)).reduce((sum, expense) => sum + expense.amount, 0);
-  const currentAttendance = attendance.filter((item) => item.date.startsWith(month));
+  const currentAttendance = attendance.filter((item) => item.date.startsWith(month) && activeIds.has(item.studentId));
   const presentCount = currentAttendance.filter((item) => item.status === "present").length;
   const avgAttendance = currentAttendance.length ? Math.round((presentCount / currentAttendance.length) * 100) : 0;
   const feeByStudent = new Map(currentFees.map((fee) => [fee.studentId, fee]));
-  const feeCollection = students.reduce((result, student) => {
+  const feeCollection = activeStudents.reduce((result, student) => {
     const fee = feeByStudent.get(student._id);
     result[fee?.status || "due"] += 1;
     return result;
   }, { paid: 0, partial: 0, due: 0 });
+  const feeDueDays = [...new Set(activeStudents
+    .filter((student) => feeByStudent.get(student._id)?.status !== "paid")
+    .map((student) => Math.min(student.feeDueDate, new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()))
+  )].sort((a, b) => a - b);
   const chartMonths = previousMonths(6);
 
   res.json({
     month,
+    dueDays: feeDueDays,
     stats: {
-      totalStudents: students.length,
+      totalStudents: activeStudents.length,
       monthlyRevenue,
-      pendingFees: Math.max(expectedRevenue - monthlyRevenue, 0),
+      pendingFees: activeStudents.reduce((sum, student) => {
+        const fee = feeByStudent.get(student._id);
+        return sum + Math.max(student.feeAmount - Number(fee?.amountPaid || 0), 0);
+      }, 0),
       avgAttendance,
       monthlyExpenses,
       netProfit: monthlyRevenue - monthlyExpenses,

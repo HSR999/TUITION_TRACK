@@ -12,27 +12,31 @@ router.use(protect);
 
 const previousMonths = (count) => {
   const result = [];
-  const now = new Date();
+  const [year, month] = currentMonth().split("-").map(Number);
   for (let offset = count - 1; offset >= 0; offset -= 1) {
-    const date = new Date(now.getFullYear(), now.getMonth() - offset, 1);
-    result.push(`${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`);
+    const date = new Date(Date.UTC(year, month - 1 - offset, 1));
+    result.push(`${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`);
   }
   return result;
 };
 
 router.get("/", async (req, res) => {
   try {
-    const teacherId = req.teacher._id;
     const month = currentMonth();
     const { start, end } = monthRange(month);
     const chartMonths = previousMonths(6);
-    const nextMonthString = `${end.getFullYear()}-${String(end.getMonth() + 1).padStart(2, "0")}-01`;
+    const nextMonthString = end.toISOString().slice(0, 10);
 
-    const [students, currentFees, currentExpenses, attendanceRecords, revenueGroups] = await Promise.all([
-      Student.find(withDataScope(req)).select("feeAmount").lean(),
+    const students = await Student.find(withDataScope(req, { isArchived: { $ne: true } }))
+      .select("feeAmount feeDueDate")
+      .lean();
+    const [currentFees, currentExpenses, attendanceRecords, revenueGroups] = await Promise.all([
       FeeRecord.find(withDataScope(req, { month })).lean(),
       Expense.find(withDataScope(req, { date: { $gte: start, $lt: end } })).lean(),
-      Attendance.find(withDataScope(req, { date: { $gte: `${month}-01`, $lt: nextMonthString } })).lean(),
+      Attendance.find(withDataScope(req, {
+        date: { $gte: `${month}-01`, $lt: nextMonthString },
+        studentId: { $in: students.map((student) => student._id) },
+      })).lean(),
       FeeRecord.aggregate([
         { $match: withDataScope(req, { month: { $in: chartMonths } }) },
         { $group: { _id: "$month", revenue: { $sum: "$amountPaid" } } },
@@ -40,9 +44,11 @@ router.get("/", async (req, res) => {
     ]);
 
     const feeByStudent = new Map(currentFees.map((fee) => [fee.studentId.toString(), fee]));
-    const expectedRevenue = students.reduce((sum, student) => sum + student.feeAmount, 0);
     const monthlyRevenue = currentFees.reduce((sum, fee) => sum + fee.amountPaid, 0);
-    const pendingFees = Math.max(expectedRevenue - monthlyRevenue, 0);
+    const pendingFees = students.reduce((sum, student) => {
+      const fee = feeByStudent.get(student._id.toString());
+      return sum + Math.max(student.feeAmount - Number(fee?.amountPaid || 0), 0);
+    }, 0);
     const monthlyExpenses = currentExpenses.reduce((sum, expense) => sum + expense.amount, 0);
     const presentCount = attendanceRecords.filter((record) => record.status === "present").length;
     const avgAttendance = attendanceRecords.length ? Math.round((presentCount / attendanceRecords.length) * 100) : 0;
@@ -56,9 +62,15 @@ router.get("/", async (req, res) => {
       { paid: 0, partial: 0, due: 0 }
     );
     const revenueByMonth = new Map(revenueGroups.map((item) => [item._id, item.revenue]));
+    const monthLength = new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5)), 0)).getUTCDate();
+    const dueDays = [...new Set(students
+      .filter((student) => feeByStudent.get(student._id.toString())?.status !== "paid")
+      .map((student) => Math.min(student.feeDueDate, monthLength))
+    )].sort((a, b) => a - b);
 
     res.json({
       month,
+      dueDays,
       stats: {
         totalStudents: students.length,
         monthlyRevenue,

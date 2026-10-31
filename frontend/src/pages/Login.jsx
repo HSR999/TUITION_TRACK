@@ -97,7 +97,7 @@ export default function Login() {
             <div className="relative mt-10 grid gap-3">
               {[
                 ["security", "JWT secured login"],
-                ["reminder", "Automated fee reminders"],
+                ["reminder", "Prepared WhatsApp reminders"],
                 ["pdf", "PDF receipts + analytics"],
               ].map(([icon, item]) => (
                 <div key={item} className="flex items-center gap-3 rounded-2xl border border-white/70 bg-white/55 px-4 py-3 text-sm font-semibold shadow-sm backdrop-blur">
@@ -124,16 +124,16 @@ export default function Login() {
               <div className="mt-8 space-y-4">
                 {mode === "register" && (
                   <label>
-                    <span className="label">Name</span>
+                    <span className="label">Name <span className="text-red-500" aria-hidden="true">*</span></span>
                     <input className="input" value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} required />
                   </label>
                 )}
                 <label>
-                  <span className="label">Email</span>
+                  <span className="label">Email <span className="text-red-500" aria-hidden="true">*</span></span>
                   <input className="input" type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} required />
                 </label>
                 <label>
-                  <span className="label">Password</span>
+                  <span className="label">Password <span className="text-red-500" aria-hidden="true">*</span></span>
                   <input className="input" type="password" minLength="6" value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} required />
                 </label>
               </div>

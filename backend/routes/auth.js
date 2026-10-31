@@ -4,6 +4,7 @@ const Teacher = require("../models/Teacher");
 const Institute = require("../models/Institute");
 const jwt = require("jsonwebtoken");
 const protect = require("../middleware/protect");
+const { normalizePhone } = require("../utils/validation");
 
 
 const router = express.Router();
@@ -40,14 +41,22 @@ router.post("/register", async (req, res) => {
   try {
     const { name, email, password, instituteName, instituteLogoUrl, phone } = req.body;
 
-    if (!name || !email || !password) {
+    if (typeof name !== "string" || name.trim().length < 2 || name.trim().length > 100
+      || typeof email !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
+      || typeof password !== "string" || !password) {
       return res.status(400).json({
-        message: "Name, email and password are required",
+        message: "Enter a valid name, email and password",
       });
     }
 
     if (password.length < 6) {
       return res.status(400).json({ message: "Password must be at least 6 characters" });
+    }
+    let normalizedPhone;
+    try {
+      normalizedPhone = normalizePhone(phone);
+    } catch (error) {
+      return res.status(400).json({ message: error.message });
     }
 
     const normalizedEmail = email.trim().toLowerCase();
@@ -64,16 +73,16 @@ router.post("/register", async (req, res) => {
     const institute = await Institute.create({
       name: instituteName?.trim() || `${name.trim()}'s Tuition`,
       logoUrl: instituteLogoUrl?.trim() || "",
-      phone: phone?.trim() || "",
+      phone: normalizedPhone,
     });
 
     const teacher = await Teacher.create({
       instituteId: institute._id,
-      name,
+      name: name.trim(),
       email: normalizedEmail,
       password,
       role: "owner",
-      phone,
+      phone: normalizedPhone,
     });
 
     institute.ownerId = teacher._id;

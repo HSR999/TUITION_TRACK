@@ -23,6 +23,7 @@ export default function ReceiptModal({ item, onClose }) {
       ["Amount paid", formatCurrency(record.amountPaid)],
       ["Payment date", formatDate(record.paidOn)],
       ["Status", record.status.toUpperCase()],
+      ["Method", record.method || "other"],
     ];
 
     rows.forEach(([label, value], index) => {
@@ -47,6 +48,8 @@ export default function ReceiptModal({ item, onClose }) {
           <ReceiptLine label="Month" value={record.month} />
           <ReceiptLine label="Paid" value={formatCurrency(record.amountPaid)} />
           <ReceiptLine label="Date" value={formatDate(record.paidOn)} />
+          <ReceiptLine label="Method" value={record.method || "other"} />
+          {record.isLegacy && <p className="text-xs leading-5 text-amber-700">{record.note}</p>}
         </div>
         <div className="flex flex-col-reverse justify-end gap-3 sm:flex-row">
           <button className="btn-secondary" onClick={onClose}>Close</button>

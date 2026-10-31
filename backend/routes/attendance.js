@@ -3,16 +3,15 @@ const Attendance = require("../models/Attendance");
 const Student = require("../models/Student");
 const protect = require("../middleware/protect");
 const { getCreateOwnership, withDataScope } = require("../utils/access");
+const { getIndiaDateKey, isValidDateKey } = require("../utils/validation");
 
 const router = express.Router();
 router.use(protect);
-const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
-
 router.get("/", async (req, res) => {
   try {
-    const date = req.query.date || new Date().toISOString().slice(0, 10);
-    if (!DATE_PATTERN.test(date)) return res.status(400).json({ message: "Date must use YYYY-MM-DD format" });
-    const studentFilters = {};
+    const date = req.query.date || getIndiaDateKey();
+    if (!isValidDateKey(date)) return res.status(400).json({ message: "Date must be a real date in YYYY-MM-DD format" });
+    const studentFilters = { isArchived: { $ne: true } };
     if (req.query.class) studentFilters.class = req.query.class;
     const studentQuery = withDataScope(req, studentFilters);
 
@@ -28,11 +27,13 @@ router.get("/", async (req, res) => {
 router.put("/mark", async (req, res) => {
   try {
     const { date, records } = req.body;
-    if (!DATE_PATTERN.test(date || "") || !Array.isArray(records)) return res.status(400).json({ message: "A valid date and records array are required" });
+    if (!isValidDateKey(date) || !Array.isArray(records) || records.length === 0) return res.status(400).json({ message: "A valid date and non-empty records array are required" });
+    if (date < getIndiaDateKey()) return res.status(403).json({ message: "Past attendance is read-only" });
     if (records.some((record) => !["present", "absent"].includes(record.status))) return res.status(400).json({ message: "Attendance status must be present or absent" });
 
     const studentIds = records.map((record) => record.studentId);
-    const ownedCount = await Student.countDocuments(withDataScope(req, { _id: { $in: studentIds } }));
+    if (new Set(studentIds).size !== studentIds.length) return res.status(400).json({ message: "Attendance records cannot include duplicate students" });
+    const ownedCount = await Student.countDocuments(withDataScope(req, { _id: { $in: studentIds }, isArchived: { $ne: true } }));
     if (ownedCount !== new Set(studentIds).size) return res.status(403).json({ message: "One or more students are invalid" });
 
     await Attendance.bulkWrite(records.map((record) => ({

@@ -7,6 +7,7 @@ const Teacher = require("../models/Teacher");
 const Institute = require("../models/Institute");
 const Student = require("../models/Student");
 const FeeRecord = require("../models/FeeRecord");
+const FeePayment = require("../models/FeePayment");
 const Attendance = require("../models/Attendance");
 const Expense = require("../models/Expense");
 const NotificationLog = require("../models/NotificationLog");
@@ -55,6 +56,7 @@ const clearExistingDemo = async () => {
   await Promise.all([
     Student.deleteMany(ownershipFilter),
     FeeRecord.deleteMany(ownershipFilter),
+    FeePayment.deleteMany(ownershipFilter),
     Attendance.deleteMany(ownershipFilter),
     Expense.deleteMany(ownershipFilter),
     NotificationLog.deleteMany(ownershipFilter),

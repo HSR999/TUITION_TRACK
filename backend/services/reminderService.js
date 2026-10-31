@@ -5,16 +5,10 @@ const { withDataScope } = require("../utils/access");
 
 const UPCOMING_REMINDER_DAYS = Number(process.env.UPCOMING_REMINDER_DAYS || 3);
 
+const { getIndiaDateKey } = require("../utils/validation");
 const getIndiaToday = () => {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Kolkata",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(new Date());
-
-  const mapped = Object.fromEntries(parts.filter((part) => part.type !== "literal").map((part) => [part.type, Number(part.value)]));
-  return new Date(mapped.year, mapped.month - 1, mapped.day);
+  const [year, month, day] = getIndiaDateKey().split("-").map(Number);
+  return new Date(year, month - 1, day);
 };
 
 const getEffectiveDueDate = ({ month, feeDueDate }) => {
@@ -31,8 +25,7 @@ const daysBetween = (startDate, endDate) => {
 
 const getReminderQueue = async ({ req, teacherId, month }) => {
   const today = getIndiaToday();
-  const scope = req ? withDataScope(req) : { teacherId };
-  const students = await Student.find(req ? withDataScope(req, { parentPhone: { $ne: "" } }) : { teacherId, parentPhone: { $ne: "" } }).sort({ class: 1, name: 1 }).lean();
+  const students = await Student.find(req ? withDataScope(req, { parentPhone: { $ne: "" }, isArchived: { $ne: true } }) : { teacherId, parentPhone: { $ne: "" }, isArchived: { $ne: true } }).sort({ class: 1, name: 1 }).lean();
   const feeRecords = await FeeRecord.find(req ? withDataScope(req, { month }) : { teacherId, month }).lean();
   const feeByStudent = new Map(feeRecords.map((record) => [record.studentId.toString(), record]));
 
@@ -73,14 +66,10 @@ const getReminderQueue = async ({ req, teacherId, month }) => {
         message,
       };
     })
-    .filter(Boolean);
-};
-
-const runDueReminderJob = async () => {
-  console.log("Manual reminder mode active: reminders are shown in the app queue, not sent automatically.");
+    .filter(Boolean)
+    .sort((left, right) => left.dueDate - right.dueDate || left.studentName.localeCompare(right.studentName));
 };
 
 module.exports = {
   getReminderQueue,
-  runDueReminderJob,
 };

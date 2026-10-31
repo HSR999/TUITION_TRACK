@@ -92,8 +92,16 @@ router.get("/reminder-queue", async (req, res) => {
     const month = req.query.month || currentMonth();
     if (!MONTH_PATTERN.test(month)) return res.status(400).json({ message: "Month must use YYYY-MM format" });
 
-    const reminders = await getReminderQueue({ req, month });
-    res.json({ month, reminders });
+    const [reminders, latestLogs] = await Promise.all([
+      getReminderQueue({ req, month }),
+      NotificationLog.aggregate([
+        { $match: withDataScope(req, { month, channel: "whatsapp_manual" }) },
+        { $sort: { sentAt: -1 } },
+        { $group: { _id: "$studentId", status: { $first: "$status" } } },
+      ]),
+    ]);
+    const handledStudents = new Set(latestLogs.filter((log) => log.status === "handled").map((log) => String(log._id)));
+    res.json({ month, reminders: reminders.filter((reminder) => !handledStudents.has(String(reminder.studentId))) });
   } catch (error) {
     res.status(500).json({ message: "Could not build reminder queue", error: error.message });
   }
@@ -104,7 +112,7 @@ router.post("/open/:studentId", async (req, res) => {
     const month = req.body.month || currentMonth();
     if (!MONTH_PATTERN.test(month)) return res.status(400).json({ message: "Month must use YYYY-MM format" });
 
-    const student = await Student.findOne(withDataScope(req, { _id: req.params.studentId }));
+    const student = await Student.findOne(withDataScope(req, { _id: req.params.studentId, isArchived: { $ne: true } }));
     if (!student) return res.status(404).json({ message: "Student not found" });
     if (!student.parentPhone) return res.status(400).json({ message: "Parent phone number is missing" });
 
@@ -159,7 +167,7 @@ router.post("/send/:studentId", async (req, res) => {
     const month = req.body.month || currentMonth();
     if (!MONTH_PATTERN.test(month)) return res.status(400).json({ message: "Month must use YYYY-MM format" });
 
-    const student = await Student.findOne(withDataScope(req, { _id: req.params.studentId }));
+    const student = await Student.findOne(withDataScope(req, { _id: req.params.studentId, isArchived: { $ne: true } }));
     if (!student) return res.status(404).json({ message: "Student not found" });
 
     const recipientPhone = normalizePhoneNumber(student.parentPhone);

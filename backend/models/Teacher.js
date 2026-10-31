@@ -1,6 +1,7 @@
 
 const mongoose =require("mongoose");
 const bcrypt = require("bcryptjs");
+const { normalizePhone } = require("../utils/validation");
 
 const pushSubscriptionSchema = new mongoose.Schema({
   endpoint: { type: String, required: true },
@@ -23,6 +24,8 @@ const teacherSchema = new mongoose.Schema({
       type: String,
       required: true,
       trim: true,
+      minlength: 2,
+      maxlength: 100,
     },
 
     email: {
@@ -31,6 +34,8 @@ const teacherSchema = new mongoose.Schema({
       unique: true,
       lowercase: true,
       trim: true,
+      maxlength: 254,
+      match: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
     },
 
     password: {
@@ -51,6 +56,11 @@ const teacherSchema = new mongoose.Schema({
       type: String,
       trim: true,
       default: "",
+      set: (value) => normalizePhone(value),
+      validate: {
+        validator: (value) => !value || /^\+[1-9]\d{7,14}$/.test(value),
+        message: "Phone must include a valid country code",
+      },
     },
 
     reminderTemplates: {

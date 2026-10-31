@@ -1,8 +1,5 @@
 const express = require("express");
 const Student = require("../models/Student");
-const FeeRecord = require("../models/FeeRecord");
-const Attendance = require("../models/Attendance");
-const NotificationLog = require("../models/NotificationLog");
 const protect = require("../middleware/protect");
 const { getCreateOwnership, withDataScope } = require("../utils/access");
 
@@ -26,7 +23,7 @@ const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 router.get("/", async (req, res) => {
   try {
-    const filters = {};
+    const filters = req.query.includeArchived === "true" ? {} : { isArchived: { $ne: true } };
     if (req.query.class) filters.class = req.query.class;
     if (req.query.search) {
       const search = new RegExp(escapeRegex(req.query.search.trim()), "i");
@@ -58,7 +55,7 @@ router.post("/", async (req, res) => {
 
 router.get("/:id", async (req, res) => {
   try {
-    const student = await Student.findOne(withDataScope(req, { _id: req.params.id }));
+    const student = await Student.findOne(withDataScope(req, { _id: req.params.id, isArchived: { $ne: true } }));
     if (!student) return res.status(404).json({ message: "Student not found" });
     res.json({ student });
   } catch (error) {
@@ -70,7 +67,7 @@ router.put("/:id", async (req, res) => {
   try {
     const updates = Object.fromEntries(editableFields.filter((field) => req.body[field] !== undefined).map((field) => [field, req.body[field]]));
     const student = await Student.findOneAndUpdate(
-      withDataScope(req, { _id: req.params.id }),
+      withDataScope(req, { _id: req.params.id, isArchived: { $ne: true } }),
       updates,
       { new: true, runValidators: true }
     );
@@ -81,20 +78,22 @@ router.put("/:id", async (req, res) => {
   }
 });
 
-router.delete("/:id", async (req, res) => {
+const setArchived = async (req, res, isArchived) => {
   try {
-    const student = await Student.findOneAndDelete(withDataScope(req, { _id: req.params.id }));
+    const student = await Student.findOneAndUpdate(
+      withDataScope(req, { _id: req.params.id, isArchived: { $ne: isArchived } }),
+      { isArchived, archivedAt: isArchived ? new Date() : null },
+      { new: true, runValidators: true }
+    );
     if (!student) return res.status(404).json({ message: "Student not found" });
-
-    await Promise.all([
-      FeeRecord.deleteMany(withDataScope(req, { studentId: student._id })),
-      Attendance.deleteMany(withDataScope(req, { studentId: student._id })),
-      NotificationLog.deleteMany(withDataScope(req, { studentId: student._id })),
-    ]);
-    res.json({ message: "Student and related records deleted" });
+    res.json({ message: isArchived ? "Student archived" : "Student restored", student });
   } catch (error) {
-    res.status(400).json({ message: "Could not delete student", error: error.message });
+    res.status(400).json({ message: "Could not update student archive status", error: error.message });
   }
-});
+};
+
+router.patch("/:id/archive", (req, res) => setArchived(req, res, true));
+router.patch("/:id/restore", (req, res) => setArchived(req, res, false));
+router.delete("/:id", (req, res) => setArchived(req, res, true));
 
 module.exports = router;

@@ -15,7 +15,7 @@ const getCurrentMonthInIndia = (today) => today.slice(0, 7);
 
 const getFeeSummary = async (teacher, month, today) => {
   const req = { teacher };
-  const students = await Student.find(withDataScope(req)).select("feeAmount feeDueDate").lean();
+  const students = await Student.find(withDataScope(req, { isArchived: { $ne: true } })).select("feeAmount feeDueDate").lean();
   const studentIds = students.map((student) => student._id);
   const records = studentIds.length
     ? await FeeRecord.find(withDataScope(req, { month, studentId: { $in: studentIds } }))

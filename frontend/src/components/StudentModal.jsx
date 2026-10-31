@@ -7,7 +7,7 @@ const emptyForm = {
 
 const fields = [
   ["name", "Student name", "text", true],
-  ["phone", "Student phone", "tel", true],
+  ["phone", "Student phone (optional)", "tel", false],
   ["parentName", "Parent name", "text", true],
   ["parentPhone", "Parent WhatsApp number", "tel", true],
   ["parentEmail", "Parent email (optional)", "email", false],
@@ -41,7 +41,7 @@ export default function StudentModal({ student, classOptions = [], onClose, onSa
         <div className="grid gap-4 sm:grid-cols-2">
           {fields.map(([name, label, type, required]) => (
             <label key={name}>
-              <span className="label">{label}</span>
+              <span className="label">{label}{required && <span className="text-red-500" aria-hidden="true"> *</span>}</span>
               <input
                 className="input"
                 name={name}
@@ -49,14 +49,20 @@ export default function StudentModal({ student, classOptions = [], onClose, onSa
                 value={form[name]}
                 onChange={update}
                 required={required}
-                min={name === "feeDueDate" ? 1 : undefined}
-                max={name === "feeDueDate" ? 31 : undefined}
+                minLength={["name", "parentName"].includes(name) ? 2 : undefined}
+                maxLength={["name", "parentName"].includes(name) ? 100 : ["phone", "parentPhone"].includes(name) ? 20 : name === "parentEmail" ? 254 : undefined}
+                min={name === "feeAmount" ? 0 : name === "feeDueDate" ? 1 : undefined}
+                max={name === "feeAmount" ? 100000000 : name === "feeDueDate" ? 31 : undefined}
+                pattern={["phone", "parentPhone"].includes(name) ? "\\+?[0-9\\s()-]{8,20}" : undefined}
+                step={name === "feeAmount" ? "0.01" : undefined}
               />
+              {name === "phone" && <span className="mt-1 block text-xs text-slate-400">Leave blank if the student does not have a phone.</span>}
+              {name === "parentPhone" && <span className="mt-1 block text-xs text-slate-400">Required for parent reminders; a 10-digit Indian number is accepted.</span>}
             </label>
           ))}
 
           <label>
-            <span className="label">Class</span>
+            <span className="label">Class <span className="text-red-500" aria-hidden="true">*</span></span>
             <input
               className="input"
               name="class"
@@ -64,6 +70,7 @@ export default function StudentModal({ student, classOptions = [], onClose, onSa
               onChange={update}
               list="student-class-options"
               placeholder="Choose an existing class or type a new one"
+              maxLength={60}
               required
             />
             <datalist id="student-class-options">
@@ -73,7 +80,7 @@ export default function StudentModal({ student, classOptions = [], onClose, onSa
 
           <label className="sm:col-span-2">
             <span className="label">Address</span>
-            <textarea className="input min-h-20" name="address" value={form.address} onChange={update} />
+            <textarea className="input min-h-20" name="address" value={form.address} onChange={update} maxLength={300} />
           </label>
         </div>
 

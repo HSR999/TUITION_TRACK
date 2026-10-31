@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const { isValidDateKey } = require("../utils/validation");
 
 const attendanceSchema = new mongoose.Schema(
   {
@@ -20,7 +21,7 @@ const attendanceSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
-    date: { type: String, required: true, match: /^\d{4}-\d{2}-\d{2}$/ },
+    date: { type: String, required: true, validate: { validator: isValidDateKey, message: "Date must be a real date in YYYY-MM-DD format" } },
     status: { type: String, required: true, enum: ["present", "absent"] },
   },
   { timestamps: true }

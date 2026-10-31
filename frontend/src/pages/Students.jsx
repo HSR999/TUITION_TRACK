@@ -15,6 +15,7 @@ export default function Students() {
   const [students, setStudents] = useState([]);
   const [search, setSearch] = useState("");
   const [selectedClass, setSelectedClass] = useState("");
+  const [includeArchived, setIncludeArchived] = useState(false);
   const [modal, setModal] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -24,7 +25,7 @@ export default function Students() {
   const load = async () => {
     try {
       setError("");
-      const { data } = await api.get("/students");
+      const { data } = await api.get("/students", { params: { includeArchived: includeArchived || undefined } });
       setStudents(data.students);
     } catch (err) {
       setError(getErrorMessage(err));
@@ -33,7 +34,7 @@ export default function Students() {
     }
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [includeArchived]);
 
   const visible = useMemo(() => students.filter((student) => (
     (!selectedClass || String(student.class).trim() === selectedClass)
@@ -58,12 +59,22 @@ export default function Students() {
     }
   };
 
-  const remove = async (student) => {
-    if (!window.confirm(`Delete ${student.name} and all related records?`)) return;
+  const archive = async (student) => {
+    if (!window.confirm(`Archive ${student.name}? Their attendance and fee history will be kept.`)) return;
     try {
-      await api.delete(`/students/${student._id}`);
-      toast("Student deleted successfully");
-      load();
+      await api.patch(`/students/${student._id}/archive`);
+      toast("Student archived; history is preserved");
+      await load();
+    } catch (err) {
+      setError(getErrorMessage(err));
+    }
+  };
+
+  const restore = async (student) => {
+    try {
+      await api.patch(`/students/${student._id}/restore`);
+      toast("Student restored");
+      await load();
     } catch (err) {
       setError(getErrorMessage(err));
     }
@@ -95,12 +106,16 @@ export default function Students() {
       <div className="my-5 flex flex-col gap-3 sm:flex-row">
         <input className="input max-w-md" placeholder="Search student or parent..." value={search} onChange={(event) => setSearch(event.target.value)} />
         <button className="btn-secondary" onClick={() => setSelectedClass("")}>All students ({students.length})</button>
+        <label className="flex items-center gap-2 text-sm font-semibold text-slate-600">
+          <input type="checkbox" checked={includeArchived} onChange={(event) => { setSelectedClass(""); setIncludeArchived(event.target.checked); }} />
+          Include archived
+        </label>
       </div>
 
       {loading ? (
         <LoadingState label="Loading students" />
       ) : students.length === 0 ? (
-        <EmptyState title="No students yet" message="Add your first student to unlock fee tracking, attendance and receipts." action={addButton} />
+        <EmptyState title={includeArchived ? "No students found" : "No active students"} message={includeArchived ? "Try another search or add a student." : "Add your first student to unlock fee tracking, attendance and receipts."} action={!includeArchived ? addButton : null} />
       ) : (
         <div className="table-wrap">
           <table className="w-full">
@@ -110,15 +125,17 @@ export default function Students() {
             <tbody>
               {visible.map((student) => (
                 <tr key={student._id}>
-                  <td><strong>{student.name}</strong><p className="text-xs text-slate-400">{student.phone}</p></td>
+                  <td><strong>{student.name}</strong><p className="text-xs text-slate-400">{student.phone || "No student phone"}</p>{student.isArchived && <span className="mt-1 inline-block rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500">Archived</span>}</td>
                   <td>Class {student.class}</td>
                   <td>{student.parentName}<p className="text-xs text-slate-400">{student.parentPhone}</p></td>
                   <td>{formatCurrency(student.feeAmount)}</td>
                   <td>{student.feeDueDate}</td>
                   <td>
                     <div className="flex gap-3">
-                      <button className="font-semibold text-brand-700" onClick={() => { setModal(student); setShowModal(true); }}>Edit</button>
-                      <button className="font-semibold text-red-600" onClick={() => remove(student)}>Delete</button>
+                      {!student.isArchived && <button className="font-semibold text-brand-700" onClick={() => { setModal(student); setShowModal(true); }}>Edit</button>}
+                      {student.isArchived
+                        ? <button className="font-semibold text-emerald-700" onClick={() => restore(student)}>Restore</button>
+                        : <button className="font-semibold text-slate-500" onClick={() => archive(student)}>Archive</button>}
                     </div>
                   </td>
                 </tr>
