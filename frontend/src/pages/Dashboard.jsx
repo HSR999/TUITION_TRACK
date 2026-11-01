@@ -7,6 +7,7 @@ import AppIcon from "../components/AppIcon";
 import LoadingState from "../components/LoadingState";
 import { useAuth } from "../context/AuthContext";
 import { formatCurrency, formatDate, getErrorMessage, today } from "../utils/format";
+import { isReminderHandledLocally } from "../utils/handledReminders";
 
 const monthDays = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
 
@@ -25,7 +26,9 @@ export default function Dashboard() {
         setData(response.data);
         try {
           const reminderResponse = await api.get("/notifications/reminder-queue", { params: { month: response.data.month } });
-          setReminders(reminderResponse.data.reminders);
+          setReminders(reminderResponse.data.reminders.filter((reminder) => (
+            !isReminderHandledLocally(response.data.month, reminder.studentId)
+          )));
         } catch (err) {
           setReminderError(getErrorMessage(err));
         }

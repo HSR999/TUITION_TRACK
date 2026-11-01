@@ -11,6 +11,7 @@ import { useAuth } from "../context/AuthContext";
 import { useToast } from "../context/ToastContext";
 import { currentMonth, formatCurrency, formatDate, getErrorMessage } from "../utils/format";
 import { DEFAULT_MESSAGE_TEMPLATE, getMessageTemplate, renderReminderMessage } from "../utils/reminders";
+import { isReminderHandledLocally, markReminderHandledLocally } from "../utils/handledReminders";
 
 const getStudentId = (student) => typeof student === "string" ? student : student?._id;
 
@@ -64,7 +65,9 @@ function ReminderQueue() {
     ])
       .then(([queueResponse, historyResponse]) => {
         if (!active) return;
-        setQueue(queueResponse.data.reminders);
+        setQueue(queueResponse.data.reminders.filter((reminder) => (
+          !isReminderHandledLocally(month, reminder.studentId)
+        )));
         setHistory(historyResponse.data.notifications);
       })
       .catch((err) => {
@@ -86,15 +89,23 @@ function ReminderQueue() {
   }, [history]);
 
   const markHandled = async (item) => {
+    const studentId = getStudentId(item.studentId);
     try {
       await api.patch(`/notifications/${item._id}/handled`);
-      const studentId = getStudentId(item.studentId);
       setQueue((current) => current.filter((reminder) => reminder.studentId !== studentId));
       setHistory((current) => current.map((log) => log._id === item._id ? { ...log, status: "handled" } : log));
       setNotice("Follow-up marked handled and removed from the pending list.");
       toast("Follow-up marked handled");
     } catch (err) {
-      setError(getErrorMessage(err));
+      if (err.response?.status === 404 && err.response?.data?.message === "Route not found") {
+        markReminderHandledLocally(month, studentId);
+        setQueue((current) => current.filter((reminder) => reminder.studentId !== studentId));
+        setHistory((current) => current.map((log) => log._id === item._id ? { ...log, status: "handled" } : log));
+        setNotice("Marked handled on this browser. Update the server to sync this status across devices.");
+        toast("Follow-up marked handled on this browser");
+      } else {
+        setError(getErrorMessage(err));
+      }
     }
   };
 
@@ -266,7 +277,13 @@ function ReminderComposer() {
       toast("Follow-up marked handled");
       navigate("/notifications", { replace: true });
     } catch (err) {
-      setError(getErrorMessage(err));
+      if (err.response?.status === 404 && err.response?.data?.message === "Route not found") {
+        markReminderHandledLocally(month, reminder.studentId);
+        toast("Follow-up marked handled on this browser");
+        navigate("/notifications", { replace: true });
+      } else {
+        setError(getErrorMessage(err));
+      }
     }
   };
 
@@ -369,7 +386,14 @@ function ReminderHistory() {
       setHistory((current) => current.map((item) => item._id === id ? { ...item, status: "handled" } : item));
       toast("Follow-up marked handled");
     } catch (err) {
-      setError(getErrorMessage(err));
+      const item = history.find((entry) => entry._id === id);
+      if (err.response?.status === 404 && err.response?.data?.message === "Route not found" && item) {
+        markReminderHandledLocally(month, getStudentId(item.studentId));
+        setHistory((current) => current.map((entry) => entry._id === id ? { ...entry, status: "handled" } : entry));
+        toast("Follow-up marked handled on this browser");
+      } else {
+        setError(getErrorMessage(err));
+      }
     }
   };
 
@@ -424,7 +448,13 @@ function ReminderSettings() {
           subscribed: Boolean(subscription && data.subscriptionEndpoints?.includes(subscription.endpoint)),
         });
       })
-      .catch((err) => setError(getErrorMessage(err)));
+      .catch((err) => {
+        if (err.response?.status === 404 && err.response?.data?.message === "Route not found") {
+          setPushStatus({ available: false, subscriptionEndpoints: [], publicKey: null, subscribed: false });
+        } else {
+          setError(getErrorMessage(err));
+        }
+      });
   }, []);
 
   const setPhoneNotifications = async () => {

@@ -56,14 +56,31 @@ export default function Fees() {
     setMessage("");
     setSavingStudentId(item.student._id);
     try {
-      const { data } = await api.post(`/fees/${item.student._id}/${month}/payments`, {
-        amount: Number(paymentAmounts[item.student._id]),
-        method: paymentMethod,
-      });
+      const amount = Number(paymentAmounts[item.student._id]);
+      let data;
+      try {
+        ({ data } = await api.post(`/fees/${item.student._id}/${month}/payments`, {
+          amount,
+          method: paymentMethod,
+        }));
+      } catch (err) {
+        if (err.response?.status !== 404 || err.response?.data?.message !== "Route not found") throw err;
+        ({ data } = await api.put(`/fees/${item.student._id}/${month}`, {
+          amountPaid: Number(item.record.amountPaid || 0) + amount,
+        }));
+      }
       setMessage("Payment recorded successfully");
       toast("Payment recorded successfully");
       await load();
-      setReceipt({ student: data.student, record: data.payment });
+      const record = data.payment || (data.record && {
+        ...data.record,
+        amountPaid: data.payment?.amountPaid ?? data.record.amountPaid,
+        paidOn: data.payment?.paidOn || data.record.paidOn,
+        status: data.payment?.status || data.record.status,
+        isLegacy: !data.payment,
+        note: data.payment ? "" : "This receipt reflects the monthly total on the older fee service.",
+      });
+      if (record) setReceipt({ student: data.student || item.student, record });
     } catch (err) {
       setError(getErrorMessage(err));
     } finally {
@@ -132,7 +149,11 @@ export default function Fees() {
               <tr><th>Student</th><th>Fee</th><th>Paid total</th><th>New payment</th><th>Status</th><th>History</th><th>Actions</th></tr>
             </thead>
             <tbody>
-              {fees.map((item) => (
+              {fees.map((item) => {
+                const payments = Array.isArray(item.payments)
+                  ? item.payments
+                  : item.record?.amountPaid > 0 ? [item.record] : [];
+                return (
                 <tr key={item.student._id}>
                   <td>
                     <strong>{item.student.name}</strong>
@@ -153,16 +174,17 @@ export default function Fees() {
                     />
                   </td>
                   <td><StatusBadge status={item.record.status} /></td>
-                  <td>{item.payments.length} payment{item.payments.length === 1 ? "" : "s"}</td>
+                  <td>{payments.length} payment{payments.length === 1 ? "" : "s"}</td>
                   <td>
                     <div className="flex flex-wrap gap-2">
                       <button className="btn-primary !px-3 !py-2" onClick={() => save(item)} disabled={savingStudentId !== null || !paymentAmounts[item.student._id] || Number(paymentAmounts[item.student._id]) <= 0 || Number(paymentAmounts[item.student._id]) > item.student.feeAmount - Number(item.record.amountPaid || 0)}>{savingStudentId === item.student._id ? "Recording..." : "Record"}</button>
                       <button className="btn-secondary !px-3 !py-2" onClick={() => remind(item)}>WhatsApp</button>
-                      {item.payments[0] && <button className="font-semibold text-brand-700" onClick={() => setReceipt({ student: item.student, record: item.payments[0] })}>Latest receipt</button>}
+                      {payments[0] && <button className="font-semibold text-brand-700" onClick={() => setReceipt({ student: item.student, record: payments[0] })}>Latest receipt</button>}
                     </div>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>
